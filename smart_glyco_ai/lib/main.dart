@@ -8,14 +8,18 @@ Future<void> main() async {
 
 class SmartGlycoApp extends StatelessWidget {
   const SmartGlycoApp({super.key});
+  
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SmartGlycoAI',
       debugShowCheckedModeBanner: false, 
-      themeMode: ThemeMode.system, 
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.light), useMaterial3: true),
-      darkTheme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal, brightness: Brightness.dark), useMaterial3: true),
+      themeMode: ThemeMode.dark, // Força o tema escuro que criámos
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A), // Cor de fundo base
+        useMaterial3: true,
+      ),
       home: const SplashScreen(), 
     );
   }

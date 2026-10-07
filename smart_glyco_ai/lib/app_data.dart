@@ -6,7 +6,8 @@ import 'dart:convert';
 
 List<CameraDescription> cameras = [];
 final FlutterLocalNotificationsPlugin notificationsPlugin = FlutterLocalNotificationsPlugin();
-final LocalAuthentication biometricAuth = LocalAuthentication(); 
+final LocalAuthentication biometricAuth = LocalAuthentication();
+ 
 
 // GLOBAL VARIABLES
 double globalIcr = 15.0;   
@@ -20,6 +21,8 @@ bool useBiometricsGlobal = false;
 
 Future<void> loadData() async {
   final prefs = await SharedPreferences.getInstance();
+  // ADICIONA ESTA LINHA TEMPORARIAMENTE PARA APAGAR TUDO AO INICIAR:
+  await prefs.clear();
   globalIcr = prefs.getDouble('icr') ?? 15.0;
   globalIsf = prefs.getDouble('isf') ?? 50.0;
   globalTarget = prefs.getDouble('target') ?? 100.0;
@@ -33,8 +36,8 @@ Future<void> loadData() async {
     globalDiary = (jsonDecode(diaryString) as List).map((e) => Map<String, dynamic>.from(e)).toList();
   } else {
     globalDiary = [
-      {'title': 'Almoço: Bife', 'carbs': 45.0, 'insulin': 3.5, 'time': '13:00', 'type': 'meal', 'imagePath': null},
-      {'title': 'Correção', 'carbs': 0.0, 'insulin': 2.0, 'time': '10:30', 'type': 'correction', 'imagePath': null},
+      {'title': 'Lunch: Steak', 'carbs': 45.0, 'insulin': 3.5, 'time': '13:00', 'type': 'meal', 'imagePath': null},
+      {'title': 'Correction', 'carbs': 0.0, 'insulin': 2.0, 'time': '10:30', 'type': 'correction', 'imagePath': null},
     ];
   }
 }

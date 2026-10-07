@@ -1,75 +1,87 @@
-import 'package:flutter/material.dart'; // Importa o framework principal do Flutter para a interface gráfica (Material Design).
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Importa o pacote para gerir notificações locais no dispositivo.
-import 'package:camera/camera.dart'; // Importa o pacote para aceder às câmaras do telemóvel.
-import 'app_data.dart'; // Importa ficheiro do teu projeto (provavelmente variáveis globais e de estado).
-import 'app_screens.dart'; // Importa ficheiro do teu projeto (com ecrãs adicionais como o MainNavigator).
+import 'package:flutter/material.dart'; // Imports the main Flutter framework for the graphical interface (Material Design).
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Imports the package to manage local notifications on the device.
+import 'package:camera/camera.dart'; // Imports the package to access the device cameras.
+import 'app_data.dart'; // Imports your project file (likely global variables and state).
+import 'app_screens.dart'; // Imports your project file (with additional screens like MainNavigator).
 
-// --- ECRÃ DE INÍCIO (SPLASH SCREEN) ---
-class SplashScreen extends StatefulWidget { // Define o SplashScreen como um widget que possui estado (Stateful).
-  const SplashScreen({super.key}); // Construtor padrão com uma chave opcional.
+// --- VERCEL DARK THEME CONSTANTS (in case they aren't globally imported) ---
+const Color bgDark = Color(0xFF0A0A0A);
+const Color cardDark = Color(0xFF111111);
+final Color borderDark = Colors.white.withOpacity(0.1);
+const Color accentBlue = Color(0xFF0070F3); 
+const Color textMain = Colors.white;
+final Color textMuted = Colors.grey.shade500;
+
+// --- SPLASH SCREEN ---
+class SplashScreen extends StatefulWidget { // Defines SplashScreen as a Stateful widget.
+  const SplashScreen({super.key}); // Default constructor with an optional key.
   @override
-  State<SplashScreen> createState() => _SplashScreenState(); // Cria e liga a classe de estado a este widget.
+  State<SplashScreen> createState() => _SplashScreenState(); // Creates and links the state class to this widget.
 }
 
 class _SplashScreenState extends State<SplashScreen> {
   @override
-  void initState() { // Método executado apenas uma vez quando o widget é inicializado.
-    super.initState(); // Chama a inicialização da classe mãe.
-    _startAppEngines(); // Chama a função que vai preparar a aplicação.
+  void initState() { // Method executed only once when the widget is initialized.
+    super.initState(); // Calls the parent class initialization.
+    _startAppEngines(); // Calls the function that will prepare the application.
   }
 
-  Future<void> _startAppEngines() async { // Função assíncrona que prepara dependências antes de entrar na app.
+  Future<void> _startAppEngines() async { // Asynchronous function that prepares dependencies before entering the app.
     try {
-      cameras = await availableCameras(); // Obtém a lista de câmaras disponíveis no dispositivo.
-      await loadData(); // Função (provavelmente de app_data.dart) que carrega dados guardados (ex: shared_preferences).
+      cameras = await availableCameras(); // Gets the list of available cameras on the device.
+      await loadData(); // Function (likely from app_data.dart) that loads saved data (e.g., shared_preferences).
       
-      // Configuração inicial para notificações no Android.
+      // Initial configuration for Android notifications.
       const AndroidInitializationSettings androidInit = AndroidInitializationSettings('@mipmap/ic_launcher'); 
-      const InitializationSettings initSettings = InitializationSettings(android: androidInit); // Agrupa as definições.
+      const InitializationSettings initSettings = InitializationSettings(android: androidInit); // Groups the settings.
       
-      dynamic magicPlugin = notificationsPlugin; // Referência para o plugin de notificações (deve estar em app_data.dart).
-      await magicPlugin.initialize(initSettings); // Inicializa o serviço de notificações.
+      dynamic magicPlugin = notificationsPlugin; // Reference to the notifications plugin (should be in app_data.dart).
+      await magicPlugin.initialize(initSettings); // Initializes the notifications service.
     } catch (e) {
-      debugPrint("Startup Error: $e"); // Se houver um erro, imprime-o na consola em vez de rebentar a app.
+      debugPrint("Startup Error: $e"); // If there's an error, prints it to the console instead of crashing the app.
     }
     
-    await Future.delayed(const Duration(seconds: 2)); // Cria uma pausa de 2 segundos para o logótipo ficar visível.
+    await Future.delayed(const Duration(seconds: 2)); // Creates a 2-second pause so the logo remains visible.
     
-    if (mounted) { // Verifica se o widget ainda está ativo na árvore antes de navegar (evita crashes).
-      // Lógica de roteamento baseada no estado do utilizador:
+    if (mounted) { // Checks if the widget is still active in the tree before navigating (prevents crashes).
+      // Routing logic based on user state:
       if (isFirstTime) { 
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen())); // 1ª vez: vai para o tutorial.
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen())); // 1st time: goes to the tutorial.
       } 
       else if (!isLoggedIn) { 
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())); // Não logado: vai para o Login.
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())); // Not logged in: goes to Login.
       } 
       else {
         if (useBiometricsGlobal) { 
-          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LockScreen())); // Logado com biometria: pede impressão digital.
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LockScreen())); // Logged in with biometrics: asks for fingerprint.
         } 
         else { 
-          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator())); // Logado sem biometria: entra direto.
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator())); // Logged in without biometrics: enters directly.
         }
       }
     }
   }
 
   @override
-  Widget build(BuildContext context) { // Constrói a interface visual do SplashScreen.
-    return Scaffold( // Estrutura base de uma página Material.
-      backgroundColor: Theme.of(context).colorScheme.surface, // Define a cor de fundo baseada no tema atual.
-      body: Center( // Centra o conteúdo no ecrã.
-        child: Column( // Coloca os elementos numa coluna (vertical).
-          mainAxisAlignment: MainAxisAlignment.center, // Centra a coluna verticalmente.
+  Widget build(BuildContext context) { // Builds the visual interface of the SplashScreen.
+    return Scaffold( // Base structure of a Material page.
+      backgroundColor: bgDark, // Sets the background color to dark Vercel theme.
+      body: Center( // Centers the content on the screen.
+        child: Column( // Places elements in a column (vertically).
+          mainAxisAlignment: MainAxisAlignment.center, // Centers the column vertically.
           children: [
-            SizedBox( // Define um tamanho fixo para a imagem.
-              width: 200, height: 200, 
-              child: Image.asset('assets/icon.png', // Carrega o ícone da app.
-              fit: BoxFit.contain, // Ajusta a imagem mantendo as proporções.
-              errorBuilder: (c, e, s) => const Icon(Icons.monitor_heart, size: 100, color: Colors.teal) // Se a imagem falhar, mostra este ícone alternativo.
-            )), 
-            const SizedBox(height: 24), // Espaçamento de 24 píxeis.
-            const CircularProgressIndicator(color: Colors.teal) // Mostra a "rodinha" de carregamento verde-azulado.
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(color: cardDark, shape: BoxShape.circle, border: Border.all(color: borderDark)),
+              child: SizedBox( // Defines a fixed size for the image.
+                width: 120, height: 120, 
+                child: Image.asset('assets/icon.png', // Loads the app icon.
+                fit: BoxFit.contain, // Adjusts the image maintaining its proportions.
+                errorBuilder: (c, e, s) => const Icon(Icons.monitor_heart, size: 80, color: accentBlue) // If the image fails to load, shows this alternative icon.
+              )),
+            ), 
+            const SizedBox(height: 32), // 32 pixels spacing.
+            const CircularProgressIndicator(color: accentBlue) // Shows the modern blue loading spinner.
           ]
         )
       )
@@ -77,8 +89,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// --- ECRÃ DE BLOQUEIO (BIOMETRIA) ---
-class LockScreen extends StatefulWidget { // Widget Stateful para gerir o estado da autenticação.
+// --- LOCK SCREEN (BIOMETRICS) ---
+class LockScreen extends StatefulWidget { // Stateful widget to manage authentication state.
   const LockScreen({super.key});
   @override
   State<LockScreen> createState() => _LockScreenState();
@@ -88,42 +100,47 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() { 
     super.initState(); 
-    _authenticate(); // Chama a autenticação biométrica assim que o ecrã abre.
+    _authenticate(); // Calls biometric authentication as soon as the screen opens.
   }
 
-  Future<void> _authenticate() async { // Função assíncrona de autenticação.
-    bool authenticated = false; // Variável para guardar o resultado da biometria.
+  Future<void> _authenticate() async { // Asynchronous authentication function.
+    bool authenticated = false; // Variable to store the biometrics result.
     try { 
-      // Pede ao utilizador para usar a impressão digital/FaceID com uma mensagem personalizada.
-      authenticated = await biometricAuth.authenticate(localizedReason: 'Por favor, autentique-se para aceder aos seus dados de saúde.'); 
+      // Asks the user to use fingerprint/FaceID with a custom message.
+      authenticated = await biometricAuth.authenticate(localizedReason: 'Please authenticate to access your health data.'); 
     } catch (e) { 
-      debugPrint("Biometric Error: $e"); // Captura e imprime falhas no sensor biométrico.
+      debugPrint("Biometric Error: $e"); // Catches and prints failures in the biometric sensor.
     }
     
-    // Se a autenticação teve sucesso e a página ainda está ativa, avança para a app principal.
+    // If authentication was successful and the page is still active, proceeds to the main app.
     if (authenticated && mounted) { 
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator())); 
     }
   }
 
   @override
-  Widget build(BuildContext context) { // Interface do ecrã de bloqueio.
+  Widget build(BuildContext context) { // Lock screen interface.
     return Scaffold(
+      backgroundColor: bgDark,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center, 
           children: [
-            Icon(Icons.lock_outline, size: 100, color: Theme.of(context).colorScheme.primary), // Ícone de cadeado.
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(color: cardDark, shape: BoxShape.circle, border: Border.all(color: borderDark)),
+              child: const Icon(Icons.lock_outline, size: 60, color: accentBlue) // Padlock icon.
+            ),
             const SizedBox(height: 24), 
-            const Text('Aplicação Bloqueada', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), // Título principal.
+            const Text('🔒 App Locked', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain)), // Main title.
             const SizedBox(height: 8), 
-            const Text('Proteção biométrica ativada.'), // Subtítulo.
+            Text('Biometric protection enabled.', style: TextStyle(color: textMuted)), // Subtitle.
             const SizedBox(height: 32), 
-            ElevatedButton.icon( // Botão para tentar a biometria novamente caso tenha falhado.
+            ElevatedButton.icon( // Button to try biometrics again if it failed.
               onPressed: _authenticate, 
-              icon: const Icon(Icons.fingerprint), // Ícone de impressão digital.
-              label: const Text('Tentar Novamente'), 
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)) // Estilo e preenchimento do botão.
+              icon: const Icon(Icons.fingerprint), // Fingerprint icon.
+              label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.w600)), 
+              style: ElevatedButton.styleFrom(backgroundColor: accentBlue, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))) // Button style and padding.
             )
           ]
         )
@@ -132,63 +149,64 @@ class _LockScreenState extends State<LockScreen> {
   }
 }
 
-// --- ECRÃ DE BOAS VINDAS (ONBOARDING) ---
-class OnboardingScreen extends StatefulWidget { // Widget Stateful porque precisamos de controlar a página atual do tutorial.
+// --- ONBOARDING SCREEN ---
+class OnboardingScreen extends StatefulWidget { // Stateful widget because we need to control the current tutorial page.
   const OnboardingScreen({super.key});
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final PageController _pageController = PageController(); // Controlador para gerir os deslizes entre páginas (swipe).
-  int _currentPage = 0; // Guarda o índice da página atual (0, 1 ou 2).
+  final PageController _pageController = PageController(); // Controller to manage swipes between pages.
+  int _currentPage = 0; // Stores the current page index (0, 1, or 2).
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea( // Garante que o conteúdo não se sobrepõe à notch ou barra de status.
+      backgroundColor: bgDark,
+      body: SafeArea( // Ensures content doesn't overlap the notch or status bar.
         child: Column(
           children: [
-            Expanded( // Faz o PageView ocupar todo o espaço disponível verticalmente.
+            Expanded( // Makes the PageView take up all available vertical space.
               child: PageView(
-                controller: _pageController, // Atribui o controlador definido acima.
-                onPageChanged: (i) => setState(() => _currentPage = i), // Atualiza o estado da '_currentPage' quando o utilizador desliza.
-                children: [ // Cria as 3 páginas do tutorial chamando a função auxiliar _buildPage.
-                  _buildPage(Icons.health_and_safety, 'Bem-vindo ao SmartGlycoAI', 'O seu assistente inteligente para gestão da diabetes.'), 
-                  _buildPage(Icons.camera_alt, 'Cálculo com Inteligência Artificial', 'Tire foto à sua refeição e a nossa IA sugere a dose exata de insulina.'), 
-                  _buildPage(Icons.notifications_active, 'Prevenção de Crises', 'Avisos preditivos antes de uma hipoglicemia acontecer.')
+                controller: _pageController, // Assigns the controller defined above.
+                onPageChanged: (i) => setState(() => _currentPage = i), // Updates the '_currentPage' state when the user swipes.
+                children: [ // Creates the 3 tutorial pages calling the _buildPage helper function.
+                  _buildPage(Icons.health_and_safety_outlined, '💙 Welcome to SmartGlycoAI', 'Your smart assistant for diabetes management.'), 
+                  _buildPage(Icons.camera_alt_outlined, '📸 AI Calculation', 'Take a picture of your meal and our AI will suggest the exact insulin dose.'), 
+                  _buildPage(Icons.notifications_active_outlined, '🚨 Crisis Prevention', 'Predictive warnings before a hypoglycemia occurs.')
                 ]
               )
             ), 
-            Padding( // Rodapé com os pontinhos (indicadores) e o botão.
+            Padding( // Footer with dots (indicators) and button.
               padding: const EdgeInsets.all(24.0), 
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Espaça os pontinhos à esquerda e o botão à direita.
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Spaces dots to the left and button to the right.
                 children: [
-                  Row( // Gera os 3 pontinhos indicadores de página.
+                  Row( // Generates the 3 page indicator dots.
                     children: List.generate(3, (index) => Container(
                       margin: const EdgeInsets.only(right: 8), 
-                      height: 10, 
-                      width: _currentPage == index ? 20 : 10, // Se for a página atual, fica mais largo.
+                      height: 8, 
+                      width: _currentPage == index ? 24 : 8, // If it's the current page, it gets wider.
                       decoration: BoxDecoration(
-                        color: _currentPage == index ? Colors.teal : Theme.of(context).colorScheme.surfaceContainerHighest, // Muda a cor da página ativa.
-                        borderRadius: BorderRadius.circular(5) // Arredonda os cantos dos pontinhos.
+                        color: _currentPage == index ? accentBlue : borderDark, // Changes the active page color.
+                        borderRadius: BorderRadius.circular(4) // Rounds the corners of the dots.
                       )
                     ))
                   ), 
-                  ElevatedButton( // Botão 'Seguinte' ou 'Começar'.
+                  ElevatedButton( // 'Next' or 'Start' button.
                     onPressed: () { 
-                      if (_currentPage == 2) { // Se estiver na última página (índice 2):
-                        isFirstTime = false; // Marca que o utilizador já viu o tutorial.
-                        saveData(); // Guarda essa informação.
-                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())); // Avança para o Login.
+                      if (_currentPage == 2) { // If on the last page (index 2):
+                        isFirstTime = false; // Marks that the user has seen the tutorial.
+                        saveData(); // Saves this information.
+                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())); // Proceeds to Login.
                       } else { 
-                        // Se não for a última, anima a transição para a próxima página.
+                        // If not the last, animates transition to the next page.
                         _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn); 
                       } 
                     }, 
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white), 
-                    child: Text(_currentPage == 2 ? 'Começar' : 'Seguinte') // Muda o texto dependendo da página em que está.
+                    style: ElevatedButton.styleFrom(backgroundColor: accentBlue, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))), 
+                    child: Text(_currentPage == 2 ? 'Start' : 'Next', style: const TextStyle(fontWeight: FontWeight.w600)) // Changes text depending on the current page.
                   )
                 ]
               )
@@ -199,70 +217,96 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // Função auxiliar para construir o layout de cada página do tutorial sem repetir código.
+  // Helper function to build the layout of each tutorial page without repeating code.
   Widget _buildPage(IconData icon, String title, String desc) { 
     return Padding(
       padding: const EdgeInsets.all(40.0), 
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center, 
         children: [
-          Icon(icon, size: 100, color: Colors.teal), // Mostra o ícone passado como argumento.
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: cardDark, shape: BoxShape.circle, border: Border.all(color: borderDark)),
+            child: Icon(icon, size: 80, color: accentBlue) // Shows the icon passed as an argument.
+          ),
           const SizedBox(height: 40), 
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)), // Mostra o título.
+          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain)), // Shows the title.
           const SizedBox(height: 16), 
-          Text(desc, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)) // Mostra a descrição.
+          Text(desc, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: textMuted)) // Shows the description.
         ]
       )
     ); 
   }
 }
 
-// --- ECRÃ DE LOGIN ---
-class LoginScreen extends StatelessWidget { // Widget Stateless porque não altera a interface baseado no próprio estado interno (apenas inputs).
+// --- LOGIN SCREEN ---
+class LoginScreen extends StatelessWidget { // Stateless widget because it doesn't change interface based on internal state (only inputs).
   const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: bgDark,
       body: SafeArea(
-        child: Padding( // Adiciona margem a toda a volta.
+        child: Padding( // Adds padding all around.
           padding: const EdgeInsets.all(24.0), 
-          child: Column( // Organiza os elementos verticalmente.
-            mainAxisAlignment: MainAxisAlignment.center, // Centra verticalmente.
-            crossAxisAlignment: CrossAxisAlignment.stretch, // Estica os elementos na horizontal para ocuparem a largura toda.
+          child: Column( // Organizes elements vertically.
+            mainAxisAlignment: MainAxisAlignment.center, // Centers vertically.
+            crossAxisAlignment: CrossAxisAlignment.stretch, // Stretches elements horizontally to take full width.
             children: [
-              const Icon(Icons.monitor_heart, size: 80, color: Colors.teal), // Logótipo simples.
+              Align(
+                alignment: Alignment.center,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(color: cardDark, shape: BoxShape.circle, border: Border.all(color: borderDark)),
+                  child: const Icon(Icons.monitor_heart, size: 60, color: accentBlue) // Simple logo.
+                ),
+              ),
               const SizedBox(height: 24), 
-              const Text('Entrar', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)), // Título do formulário.
+              const Text('Welcome Back', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textMain)), // Form title.
               const SizedBox(height: 32), 
-              const TextField( // Campo de texto para o Email.
-                decoration: InputDecoration(labelText: 'Email', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email))
+              TextField( // Text field for Email.
+                style: const TextStyle(color: textMain),
+                decoration: InputDecoration(
+                  labelText: 'Email', labelStyle: TextStyle(color: textMuted),
+                  prefixIcon: Icon(Icons.email_outlined, color: textMuted),
+                  filled: true, fillColor: cardDark,
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderDark)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: accentBlue))
+                )
               ), 
               const SizedBox(height: 16), 
-              const TextField( // Campo de texto para a Palavra-passe.
-                obscureText: true, // Esconde o texto digitado (como password).
-                decoration: InputDecoration(labelText: 'Palavra-passe', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))
+              TextField( // Text field for Password.
+                obscureText: true, // Hides typed text (as a password).
+                style: const TextStyle(color: textMain),
+                decoration: InputDecoration(
+                  labelText: 'Password', labelStyle: TextStyle(color: textMuted),
+                  prefixIcon: Icon(Icons.lock_outline, color: textMuted),
+                  filled: true, fillColor: cardDark,
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderDark)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: accentBlue))
+                )
               ), 
               const SizedBox(height: 24), 
-              ElevatedButton( // Botão de login por email/password.
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.teal, foregroundColor: Colors.white), 
+              ElevatedButton( // Login button by email/password.
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: accentBlue, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))), 
                 onPressed: () { 
-                  isLoggedIn = true; // Atualiza a variável global dizendo que há um login ativo. (NOTA: lógica mockada, em produção deves validar com backend)
-                  saveData(); // Guarda o estado do login localmente.
-                  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator())); // Navega para a app.
+                  isLoggedIn = true; // Updates global variable saying there is an active login. (NOTE: mocked logic, in production validate with backend)
+                  saveData(); // Saves the login state locally.
+                  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator())); // Navigates to the app.
                 }, 
-                child: const Text('Entrar', style: TextStyle(fontSize: 16))
+                child: const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))
               ), 
               const SizedBox(height: 16), 
-              OutlinedButton.icon( // Botão de login com a Google.
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)), 
+              OutlinedButton.icon( // Google login button.
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), side: BorderSide(color: borderDark), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))), 
                 onPressed: () { 
-                  isLoggedIn = true; // Simula também o login com o Google.
+                  isLoggedIn = true; // Also simulates Google login.
                   saveData(); 
                   Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator()));
                 }, 
-                icon: const Icon(Icons.g_mobiledata, color: Colors.red), // Ícone do G.
-                label: Text('Entrar com Google', style: TextStyle(color: Theme.of(context).colorScheme.onSurface))
+                icon: const Icon(Icons.g_mobiledata, color: Colors.white, size: 28), // G icon.
+                label: const Text('Sign in with Google', style: TextStyle(color: textMain, fontWeight: FontWeight.w600))
               )
             ]
           )
