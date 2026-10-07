@@ -25,8 +25,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startAppEngines() async {
-    // Mantém o carregamento durante exatamente 4 segundos
-    await Future.delayed(const Duration(seconds: 4));
+    // Mantém o carregamento durante exatamente 10 segundos
+    await Future.delayed(const Duration(seconds: 10));
     
     if (mounted) {
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
@@ -42,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
         height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/splash_logo.jpeg'), // O nome do teu ficheiro de imagem[cite: 5]
+            image: AssetImage('assets/splash_logo.jpg'), // O nome do teu ficheiro de imagem[cite: 5]
             fit: BoxFit.cover, // Preenche todo o ecrã do telemóvel
           ),
         ),
