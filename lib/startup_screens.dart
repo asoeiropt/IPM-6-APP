@@ -25,11 +25,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startAppEngines() async {
-    // Espera apenas 2 segundos para mostrar o logo, sem bloquear com câmaras ou dados
-    await Future.delayed(const Duration(seconds: 2));
+    // Mantém o carregamento durante exatamente 4 segundos
+    await Future.delayed(const Duration(seconds: 4));
     
     if (mounted) {
-      // Avança direto para o tutorial (Onboarding) para poderes ver o design
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
     }
   }
@@ -38,25 +37,37 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgDark,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logótipo original da aplicação
-            SizedBox(
-              width: 200, 
-              height: 200, 
-              child: Image.asset(
-                'assets/icon.png', 
-                fit: BoxFit.contain,
-                errorBuilder: (c, e, s) => const Icon(Icons.broken_image, size: 80, color: Colors.grey)
-              )
-            ), 
-            const SizedBox(height: 32),
-            const CircularProgressIndicator(color: accentBlue)
-          ]
-        )
-      )
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/splash_logo.jpeg'), // O nome do teu ficheiro de imagem[cite: 5]
+            fit: BoxFit.cover, // Preenche todo o ecrã do telemóvel
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end, // Alinha no fundo
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 48.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.4), // Fundo escuro suave para dar contraste à roda
+                    shape: BoxShape.circle,
+                  ),
+                  child: const CircularProgressIndicator(
+                    color: Colors.white, // Branco puro para garantir que se vê perfeitamente contra qualquer fundo
+                    strokeWidth: 3.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

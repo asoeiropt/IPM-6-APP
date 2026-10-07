@@ -735,29 +735,153 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   }
 }
 
+// ==========================================
+// CÂMARA CORRIGIDA (AGORA SIM, FULLSCREEN REAL)
+// ==========================================
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
+
   @override
   State<CameraScreen> createState() => _CameraScreenState();
 }
+
 class _CameraScreenState extends State<CameraScreen> {
-  late CameraController _controller; bool _isInitialized = false;
+  CameraController? _controller;
+  List<CameraDescription>? _cameras;
+  bool _isInitialized = false;
+  bool _isTakingPicture = false;
+
   @override
-  void initState() { super.initState(); if (cameras.isNotEmpty) { _controller = CameraController(cameras[0], ResolutionPreset.high, enableAudio: false); _controller.initialize().then((_) { if (mounted) setState(() => _isInitialized = true); }).catchError((e) => debugPrint("Camera Error: $e")); } }
+  void initState() {
+    super.initState();
+    _initCamera();
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        _controller = CameraController(
+          _cameras![0],
+          ResolutionPreset.max,
+          enableAudio: false,
+        );
+
+        await _controller!.initialize();
+
+        if (!mounted) return;
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint("Erro ao inicializar a câmara: $e");
+    }
+  }
+
+  Future<void> _takePicture() async {
+    if (_controller == null || !_controller!.value.isInitialized || _isTakingPicture) {
+      return;
+    }
+
+    try {
+      setState(() {
+        _isTakingPicture = true;
+      });
+
+      final XFile image = await _controller!.takePicture();
+
+      if (!mounted) return;
+      
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => AnalysisResultScreen(imagePath: image.path))
+      );
+
+    } catch (e) {
+      debugPrint("Erro ao tirar a fotografia: $e");
+      setState(() {
+        _isTakingPicture = false;
+      });
+    }
+  }
+
   @override
-  void dispose() { if (_isInitialized) _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (cameras.isEmpty) return Scaffold(backgroundColor: bgDark, appBar: AppBar(title: const Text('No Camera', style: TextStyle(color: textMain, fontSize: 16)), backgroundColor: bgDark, elevation: 0), body: Center(child: Text('📷 Device camera unavailable.', style: TextStyle(color: textMuted))));
+    if (!_isInitialized || _controller == null) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: Colors.black, 
-      appBar: AppBar(title: const Text('📸 Capture', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)), backgroundColor: Colors.transparent, elevation: 0, iconTheme: const IconThemeData(color: Colors.white)), 
-      body: _isInitialized ? Center(child: CameraPreview(_controller)) : const Center(child: CircularProgressIndicator(color: Colors.white)), 
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async { final image = await _controller.takePicture(); if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => AnalysisResultScreen(imagePath: image.path))); }, 
-        backgroundColor: Colors.white, elevation: 0, child: const Icon(Icons.camera, color: Colors.black, size: 28)
-      ), 
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat
+      backgroundColor: Colors.black,
+      // O SIZEDBOX.EXPAND É A MAGIA QUE IMPEDE O ECRÃ DE ENCOLHER
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            // CÂMARA A PREENCHER TUDO
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: 100,
+                  height: 100 * _controller!.value.aspectRatio,
+                  child: CameraPreview(_controller!),
+                ),
+              ),
+            ),
+            
+            // BOTÃO DE VOLTAR ATRÁS FIXADO NO TOPO ESQUERDO
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+
+            // BOTÃO DE TIRAR FOTO FIXADO NO FUNDO
+            Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _isTakingPicture
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : GestureDetector(
+                        onTap: _takePicture,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.camera_alt,
+                              size: 40,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
