@@ -15,7 +15,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 
-// --- CONSTANTES DE ESTILO VERCEL DARK ---
+// --- CONSTANTES DE ESTILO VERCEL DARK --- COlab 
 const Color bgDark = Color(0xFF0A0A0A);
 const Color cardDark = Color(0xFF111111);
 final Color borderDark = Colors.white.withOpacity(0.1);
