@@ -18,6 +18,9 @@
 	<string>smart_glyco_ai</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Permissão para a câmara -->
+	<key>NSCameraUsageDescription</key>
+	<string>Precisamos da câmara para digitalizar códigos de barras e analisar refeições.</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
