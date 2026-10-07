@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart'; // PACOTE MODERNO AQUI!
+import 'package:mobile_scanner/mobile_scanner.dart'; // PACOTE MODERNO AQUI!
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
@@ -165,7 +165,20 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
       String? barcodeScanRes = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => const SimpleBarcodeScannerPage(),
+          builder: (context) => Scaffold(
+  appBar: AppBar(title: const Text('Digitalizar Código')),
+  body: MobileScanner(
+    onDetect: (capture) {
+      final List<Barcode> barcodes = capture.barcodes;
+      if (barcodes.isNotEmpty) {
+        final String? code = barcodes.first.rawValue;
+        if (code != null) {
+          Navigator.pop(context, code);
+        }
+      }
+    },
+  ),
+),
         ),
       );
       
