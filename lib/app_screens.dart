@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
@@ -15,11 +15,11 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 
-// --- CONSTANTES DE ESTILO VERCEL DARK --- COlab
+// --- CONSTANTES DE ESTILO VERCEL DARK ---
 const Color bgDark = Color(0xFF0A0A0A);
 const Color cardDark = Color(0xFF111111);
 final Color borderDark = Colors.white.withOpacity(0.1);
-const Color accentBlue = Color(0xFF0070F3); // Destaques em azul
+const Color accentBlue = Color(0xFF0070F3);
 const Color textMain = Colors.white;
 final Color textMuted = Colors.grey.shade500;
 
@@ -58,7 +58,7 @@ class _MainNavigatorState extends State<MainNavigator> {
   Future<void> _showPredictiveAlert() async {
     try {
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails('ai_alerts', 'AI Alerts', importance: Importance.max, priority: Priority.high, icon: '@mipmap/ic_launcher', color: Colors.red, enableVibration: true);
-      const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
+      const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails, iOS: DarwinNotificationDetails());
       dynamic magicPlugin = notificationsPlugin;
       await magicPlugin.show(id: 0, title: '🚨 Predictive Alert', body: 'Prediction: 65 mg/dL in 20 min. Suggested: 15g carbs.', notificationDetails: notificationDetails);
     } catch (e) {
@@ -110,8 +110,6 @@ class _MainNavigatorState extends State<MainNavigator> {
           ]
         ),
       ),
-      
-      // --- AQUI ENTRA O NOVO BOTÃO ANIMADO (SPEED DIAL) ---
       floatingActionButton: SpeedDial(
         icon: Icons.add,
         activeIcon: Icons.close,
@@ -163,7 +161,7 @@ class _MainNavigatorState extends State<MainNavigator> {
           ),
           SpeedDialChild(
             child: const Icon(Icons.water_drop_outlined, color: Colors.white),
-            backgroundColor: accentBlue, // Azul Vercel para dar destaque à correção
+            backgroundColor: accentBlue,
             labelWidget: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               margin: const EdgeInsets.only(right: 12),
@@ -180,7 +178,7 @@ class _MainNavigatorState extends State<MainNavigator> {
           ),
         ],
       ), 
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // Mudei para a direita (endFloat) porque o SpeedDial funciona e fica melhor no canto
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
@@ -248,7 +246,6 @@ class HomeTab extends StatelessWidget {
                   ))
                 ),
                 const SizedBox(height: 24),
-                // Botão "Advanced Analytics" alinhado em baixo do gráfico
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -274,7 +271,6 @@ class HomeTab extends StatelessWidget {
   }
 }
 
-// --- PÁGINA ISOLADA DO GRÁFICO AVANÇADO ---
 class AdvancedChartScreen extends StatefulWidget {
   const AdvancedChartScreen({super.key});
 
@@ -497,12 +493,9 @@ class _ProfileTabState extends State<ProfileTab> {
     return showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: cardDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderDark)), title: Text('✏ Edit $title', style: const TextStyle(color: textMain)), content: TextField(controller: controller, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: InputDecoration(suffixText: unit, suffixStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: borderDark)), focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: textMuted))), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0), onPressed: () { if (controller.text.isNotEmpty) { onSave(double.parse(controller.text)); saveData(); setState(() {}); } Navigator.pop(context); }, child: const Text('Save'))]));
   }
   
-  // NOVA FUNÇÃO DE EXPORTAÇÃO EM PDF
   Future<void> _exportReport() async {
-    // Cria o documento PDF
     final pdf = pw.Document();
 
-    // Adiciona uma página em formato A4
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -510,26 +503,23 @@ class _ProfileTabState extends State<ProfileTab> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Cabeçalho
               pw.Header(
                 level: 0,
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('SmartGlycoAI', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: const PdfColor(0, 0.44, 0.95))), // Azul Vercel
+                    pw.Text('SmartGlycoAI', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: const PdfColor(0, 0.44, 0.95))),
                     pw.Text('Clinical Report', style: const pw.TextStyle(fontSize: 18, color: PdfColors.grey700)),
                   ],
                 ),
               ),
               pw.SizedBox(height: 20),
               
-              // Informação do Paciente
               pw.Text('Patient: João Silva', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
               pw.Text('Condition: Type 1 Diabetes', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
               pw.Text('Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
               pw.SizedBox(height: 20),
               
-              // Caixa de Parâmetros
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
                 decoration: pw.BoxDecoration(
@@ -548,7 +538,6 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
               pw.SizedBox(height: 30),
               
-              // Tabela de Diário
               pw.Text('Daily Event Log', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 10),
               if (globalDiary.isEmpty)
@@ -557,7 +546,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 pw.TableHelper.fromTextArray(
                   context: context,
                   headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                  headerDecoration: const pw.BoxDecoration(color: PdfColor(0, 0.44, 0.95)), // Azul Vercel
+                  headerDecoration: const pw.BoxDecoration(color: PdfColor(0, 0.44, 0.95)),
                   rowDecoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5))),
                   cellAlignment: pw.Alignment.centerLeft,
                   data: <List<String>>[
@@ -573,7 +562,6 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
                 
               pw.Spacer(),
-              // Rodapé
               pw.Divider(color: PdfColors.grey300),
               pw.Center(child: pw.Text('Generated securely by SmartGlycoAI Mobile App.', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey))),
             ],
@@ -582,12 +570,10 @@ class _ProfileTabState extends State<ProfileTab> {
       ),
     );
 
-    // Guarda o PDF temporariamente no dispositivo
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/SmartGlycoAI_ClinicalReport.pdf');
     await file.writeAsBytes(await pdf.save());
 
-    // Partilha o ficheiro PDF nativamente (WhatsApp, Email, etc.)
     await Share.shareXFiles([XFile(file.path)], text: 'Clinical Report from SmartGlycoAI');
   }
 
@@ -642,7 +628,30 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
   Future<void> _scanBarcode() async {
     try {
-      String? barcodeScanRes = await Navigator.push(context, MaterialPageRoute(builder: (context) => const SimpleBarcodeScannerPage()));
+      String? barcodeScanRes = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const Text('Digitalizar Código', style: TextStyle(color: textMain, fontSize: 16)),
+              backgroundColor: cardDark,
+              iconTheme: const IconThemeData(color: textMain),
+            ),
+            body: MobileScanner(
+              onDetect: (capture) {
+                final List<Barcode> barcodes = capture.barcodes;
+                if (barcodes.isNotEmpty) {
+                  final String? code = barcodes.first.rawValue;
+                  if (code != null) {
+                    Navigator.pop(context, code);
+                  }
+                }
+              },
+            ),
+          ),
+        ),
+      );
+
       if (barcodeScanRes != null && barcodeScanRes != '-1' && barcodeScanRes.isNotEmpty) {
         setState(() { _isLoadingBarcode = true; });
         final url = Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcodeScanRes.json');
@@ -651,7 +660,11 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
           final data = jsonDecode(response.body);
           if (data['status'] == 1) { 
             final product = data['product'];
-            setState(() { tCtrl.text = product['product_name'] ?? 'Unknown Product'; cCtrl.text = (double.tryParse((product['nutriments']?['carbohydrates_100g'] ?? 0).toString()) ?? 0.0).toStringAsFixed(1); iCtrl.text = ((double.tryParse(cCtrl.text) ?? 0) / globalIcr).toStringAsFixed(1); });
+            setState(() { 
+              tCtrl.text = product['product_name'] ?? 'Unknown Product'; 
+              cCtrl.text = (double.tryParse((product['nutriments']?['carbohydrates_100g'] ?? 0).toString()) ?? 0.0).toStringAsFixed(1); 
+              iCtrl.text = ((double.tryParse(cCtrl.text) ?? 0) / globalIcr).toStringAsFixed(1); 
+            });
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Product fetched!', style: TextStyle(color: Colors.black)), backgroundColor: Colors.greenAccent));
           } else {
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Product not found.', style: TextStyle(color: Colors.black)), backgroundColor: Colors.orangeAccent));
