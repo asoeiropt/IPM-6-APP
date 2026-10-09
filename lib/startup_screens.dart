@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_data.dart'; 
-import 'app_screens.dart'; 
-
-// --- CONSTANTES DE ESTILO (Baseadas nas imagens) ---
-const Color bgDark = Colors.black; 
-const Color cardDark = Color(0xFF111111); 
-const Color accentBlue = Color(0xFF0070F3); 
-final Color borderDark = Colors.white.withOpacity(0.05);
-const Color textMain = Colors.white;
-final Color textMuted = Colors.grey.shade500;
+import 'main_navigator.dart';
+import 'package:smart_glyco_ai/constants.dart';
 
 // --- ECRÃ DE INÍCIO (SPLASH SCREEN) ---
 class SplashScreen extends StatefulWidget {
