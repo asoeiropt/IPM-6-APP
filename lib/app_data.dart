@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:home_widget/home_widget.dart';
 
 List<CameraDescription> cameras = [];
 final FlutterLocalNotificationsPlugin notificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -37,6 +38,9 @@ Future<void> loadData() async {
       {'title': 'Correção', 'carbs': 0.0, 'insulin': 2.0, 'time': '10:30', 'type': 'correction', 'imagePath': null},
     ];
   }
+
+  // ENVIA OS VALORES ESTÁTICOS PARA O WIDGET ASSIM QUE A APP ABRE
+  await updateHomeWidget('115', '➡️', '1.2');
 }
 
 Future<void> saveData() async {
@@ -49,4 +53,18 @@ Future<void> saveData() async {
   await prefs.setBool('askedForNotifications', askedForNotifications);
   await prefs.setBool('useBiometrics', useBiometricsGlobal); 
   await prefs.setString('diary', jsonEncode(globalDiary));
+}
+
+// ==========================================
+// FUNÇÃO PARA ATUALIZAR O WIDGET DO ECRÃ
+// ==========================================
+Future<void> updateHomeWidget(String glucose, String trend, String iob) async {
+  await HomeWidget.saveWidgetData<String>('glucose_val', glucose);
+  await HomeWidget.saveWidgetData<String>('trend_val', trend);
+  await HomeWidget.saveWidgetData<String>('iob_val', 'IOB: $iob U');
+  
+  await HomeWidget.updateWidget(
+    name: 'GlycoWidgetProvider', 
+    iOSName: 'GlycoWidget', 
+  );
 }
