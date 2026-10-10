@@ -19,82 +19,195 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   Future<void> _editValue(String title, double currentValue, String unit, Function(double) onSave) async {
     TextEditingController controller = TextEditingController(text: currentValue.toString());
-    return showDialog(context: context, builder: (context) => AlertDialog(backgroundColor: cardDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderDark)), title: Text('✏ Edit $title', style: const TextStyle(color: textMain)), content: TextField(controller: controller, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: InputDecoration(suffixText: unit, suffixStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: borderDark)), focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white)))), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: textMuted))), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0), onPressed: () { if (controller.text.isNotEmpty) { onSave(double.parse(controller.text)); saveData(); setState(() {}); } Navigator.pop(context); }, child: const Text('Save'))]));
+    return showDialog(
+      context: context, 
+      builder: (context) => AlertDialog(
+        backgroundColor: cardDark, 
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderDark)), 
+        title: Text('✏ Edit $title', style: const TextStyle(color: textMain)), 
+        content: TextField(
+          controller: controller, 
+          keyboardType: TextInputType.number, 
+          style: const TextStyle(color: textMain), 
+          decoration: InputDecoration(
+            suffixText: unit, 
+            suffixStyle: TextStyle(color: textMuted), 
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: borderDark)), 
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white))
+          )
+        ), 
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: textMuted))), 
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0), 
+            onPressed: () { 
+              if (controller.text.isNotEmpty) { 
+                onSave(double.parse(controller.text)); 
+                saveData(); 
+                setState(() {}); 
+              } 
+              Navigator.pop(context); 
+            }, 
+            child: const Text('Save')
+          )
+        ]
+      )
+    );
   }
   
   Future<void> _exportReport() async {
     final pdf = pw.Document();
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Header(
-                level: 0,
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('SmartGlycoAI', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: const PdfColor(0, 0.44, 0.95))),
-                    pw.Text('Clinical Report', style: const pw.TextStyle(fontSize: 18, color: PdfColors.grey700)),
-                  ],
-                ),
+          return [
+            // --- CABEÇALHO CLÍNICO PROFISSIONAL ---
+            pw.Header(
+              level: 0,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('SmartGlycoAI', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: const PdfColor(0, 0.44, 0.95))),
+                      pw.Text('Clinical Data Report', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+                    ]
+                  ),
+                  pw.Text('Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                ]
+              )
+            ),
+            pw.SizedBox(height: 20),
+            
+            // --- CAIXA DE RESUMO DO PACIENTE ---
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                border: pw.Border.all(color: PdfColors.grey300)
               ),
-              pw.SizedBox(height: 20),
-              
-              pw.Text('Patient: João Silva', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Condition: Type 1 Diabetes', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
-              pw.Text('Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
-              pw.SizedBox(height: 20),
-              
-              pw.Container(
-                padding: const pw.EdgeInsets.all(12),
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.grey100, 
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                  border: pw.Border.all(color: PdfColors.grey300)
-                ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-                  children: [
-                    pw.Text('ICR: $globalIcr g/U', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    pw.Text('ISF: $globalIsf mg/dL/U', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    pw.Text('Target: $globalTarget mg/dL', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  ],
-                ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Patient: Afonso Lopes Soeiro', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Condition: Type 1 Diabetes', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 8),
+                      pw.Text('Insulin-to-Carb Ratio (ICR): ${globalIcr.toStringAsFixed(1)} g/U', style: const pw.TextStyle(fontSize: 12)),
+                      pw.Text('Insulin Sensitivity (ISF): ${globalIsf.toStringAsFixed(1)} mg/dL/U', style: const pw.TextStyle(fontSize: 12)),
+                    ]
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('Time in Range', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                      pw.Text('85% Optimal', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.green600)),
+                      pw.SizedBox(height: 8),
+                      pw.Text('Target Glucose', style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                      pw.Text('${globalTarget.toStringAsFixed(0)} mg/dL', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                    ]
+                  )
+                ]
+              )
+            ),
+            pw.SizedBox(height: 30),
+
+            // --- CALENDÁRIO HEATMAP NO PDF ---
+            pw.Text('30-Day Control Heatmap', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: const PdfColor(0, 0.44, 0.95))),
+            pw.SizedBox(height: 10),
+            pw.Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: List.generate(30, (index) {
+                // Mesma lógica visual do ecrã Home
+                PdfColor boxColor = PdfColors.green400; 
+                if (index == 5 || index == 12 || index == 22 || index == 29) boxColor = PdfColors.orange400;
+                if (index == 8 || index == 18 || index == 27) boxColor = PdfColors.red400;
+
+                return pw.Container(
+                  width: 25,
+                  height: 25,
+                  decoration: pw.BoxDecoration(
+                    color: boxColor,
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  alignment: pw.Alignment.center,
+                  child: pw.Text(
+                    '${index + 1}', 
+                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white)
+                  ),
+                );
+              }),
+            ),
+            pw.SizedBox(height: 12),
+            // Legenda do Heatmap
+            pw.Row(
+              children: [
+                pw.Container(width: 10, height: 10, color: PdfColors.green400),
+                pw.SizedBox(width: 4),
+                pw.Text('In Target', style: const pw.TextStyle(fontSize: 10)),
+                pw.SizedBox(width: 16),
+                pw.Container(width: 10, height: 10, color: PdfColors.orange400),
+                pw.SizedBox(width: 4),
+                pw.Text('Hyperglycemia', style: const pw.TextStyle(fontSize: 10)),
+                pw.SizedBox(width: 16),
+                pw.Container(width: 10, height: 10, color: PdfColors.red400),
+                pw.SizedBox(width: 4),
+                pw.Text('Hypoglycemia', style: const pw.TextStyle(fontSize: 10)),
+              ]
+            ),
+            pw.SizedBox(height: 30),
+            
+            // --- TABELA DE EVENTOS ---
+            pw.Text('Detailed Event Log', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: const PdfColor(0, 0.44, 0.95))),
+            pw.SizedBox(height: 10),
+            
+            if (globalDiary.isEmpty)
+              pw.Text('No entries found for this period.', style: const pw.TextStyle(color: PdfColors.grey))
+            else
+              pw.TableHelper.fromTextArray(
+                context: context,
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor(0, 0.44, 0.95)),
+                rowDecoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5))),
+                cellPadding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                cellStyle: const pw.TextStyle(fontSize: 10),
+                cellAlignments: {
+                  0: pw.Alignment.centerLeft,
+                  1: pw.Alignment.centerLeft,
+                  2: pw.Alignment.centerLeft,
+                  3: pw.Alignment.center,
+                  4: pw.Alignment.center,
+                },
+                data: <List<String>>[
+                  ['Time', 'Type', 'Description & Tags', 'Carbs (g)', 'Insulin (U)'],
+                  ...globalDiary.map((item) {
+                    final tags = item['tags'] as List<dynamic>?;
+                    final tagsStr = tags != null && tags.isNotEmpty ? '\nTags: ${tags.join(', ')}' : '';
+                    
+                    return [
+                      item['time'].toString(),
+                      item['type'].toString().toUpperCase(),
+                      '${item['title']}$tagsStr',
+                      item['carbs'].toString(),
+                      item['insulin'].toString()
+                    ];
+                  })
+                ],
               ),
-              pw.SizedBox(height: 30),
               
-              pw.Text('Daily Event Log', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 10),
-              if (globalDiary.isEmpty)
-                pw.Text('No entries found for this period.', style: const pw.TextStyle(color: PdfColors.grey))
-              else
-                pw.TableHelper.fromTextArray(
-                  context: context,
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                  headerDecoration: const pw.BoxDecoration(color: PdfColor(0, 0.44, 0.95)),
-                  rowDecoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5))),
-                  cellAlignment: pw.Alignment.centerLeft,
-                  data: <List<String>>[
-                    ['Time', 'Type', 'Description', 'Carbs (g)', 'Insulin (U)'],
-                    ...globalDiary.map((item) => [
-                          item['time'].toString(),
-                          item['type'].toString().toUpperCase(),
-                          item['title'].toString(),
-                          item['carbs'].toString(),
-                          item['insulin'].toString()
-                        ])
-                  ],
-                ),
-                
-              pw.Spacer(),
-              pw.Divider(color: PdfColors.grey300),
-              pw.Center(child: pw.Text('Generated securely by SmartGlycoAI Mobile App.', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey))),
-            ],
-          );
+            pw.SizedBox(height: 30),
+            pw.Center(child: pw.Text('-- End of Clinical Report --', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey500))),
+            pw.SizedBox(height: 10),
+            pw.Center(child: pw.Text('Generated securely by SmartGlycoAI.', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey))),
+          ];
         },
       ),
     );
@@ -113,7 +226,25 @@ class _ProfileTabState extends State<ProfileTab> {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        Center(child: Column(children: [Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: borderDark)), child: const Icon(Icons.person, size: 40, color: Colors.white)), const SizedBox(height: 16), const Text('👋 João Silva', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: textMain)), Text('Type 1 Diabetes', style: TextStyle(fontSize: 14, color: textMuted)), const SizedBox(height: 8), TextButton(onPressed: () { isLoggedIn = false; saveData(); Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));}, child: const Text('🚪 Log Out', style: TextStyle(color: Colors.redAccent, fontSize: 13)))])),
+        Center(
+          child: Column(
+            children: [
+              Container(width: 80, height: 80, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: borderDark)), child: const Icon(Icons.person, size: 40, color: Colors.white)), 
+              const SizedBox(height: 16), 
+              const Text('👋 Afonso', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: textMain)), 
+              Text('Type 1 Diabetes', style: TextStyle(fontSize: 14, color: textMuted)), 
+              const SizedBox(height: 8), 
+              TextButton(
+                onPressed: () { 
+                  isLoggedIn = false; 
+                  saveData(); 
+                  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+                }, 
+                child: const Text('🚪 Log Out', style: TextStyle(color: Colors.redAccent, fontSize: 13))
+              )
+            ]
+          )
+        ),
         
         _buildSectionHeader('🔒 Security'),
         Container(decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderDark)), child: SwitchListTile(activeColor: Colors.white, inactiveTrackColor: bgDark, title: const Text('Biometric Lock', style: TextStyle(color: textMain, fontSize: 14)), subtitle: Text('Require FaceID/TouchID', style: TextStyle(color: textMuted, fontSize: 12)), value: useBiometricsGlobal, onChanged: (bool value) async { bool supported = await biometricAuth.canCheckBiometrics; if (supported || !value) { setState(() => useBiometricsGlobal = value); saveData(); } else { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Device unsupported.', style: TextStyle(color: Colors.black)), backgroundColor: Colors.redAccent)); } })),

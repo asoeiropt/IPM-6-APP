@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <--- IMPORTANTE PARA AS VIBRAÇÕES
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -6,7 +7,9 @@ import '../constants.dart';
 import '../app_data.dart';
 
 class ManualEntryScreen extends StatefulWidget {
-  const ManualEntryScreen({super.key});
+  final String initialType; 
+  const ManualEntryScreen({super.key, this.initialType = 'meal'}); 
+
   @override
   State<ManualEntryScreen> createState() => _ManualEntryScreenState();
 }
@@ -15,13 +18,24 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   final TextEditingController tCtrl = TextEditingController(); 
   final TextEditingController cCtrl = TextEditingController(); 
   final TextEditingController iCtrl = TextEditingController(); 
-  String _entryType = 'meal'; 
+  late String _entryType; 
   bool _isLoadingBarcode = false; 
+
+  final List<String> _availableTags = ['🏋️ Pós-Treino', '🤒 Doente', '😤 Stress', '🏃 Ativo'];
+  final List<String> _selectedTags = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _entryType = widget.initialType; 
+  }
 
   @override
   void dispose() { tCtrl.dispose(); cCtrl.dispose(); iCtrl.dispose(); super.dispose(); }
 
   Future<void> _scanBarcode() async {
+    // Vibração ao abrir o scanner
+    HapticFeedback.lightImpact();
     try {
       String? barcodeScanRes = await Navigator.push<String>(
         context,
@@ -38,6 +52,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                 if (barcodes.isNotEmpty) {
                   final String? code = barcodes.first.rawValue;
                   if (code != null) {
+                    HapticFeedback.mediumImpact(); // Vibra quando deteta o código!
                     Navigator.pop(context, code);
                   }
                 }
@@ -96,7 +111,10 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             SegmentedButton<String>(
               segments: const [ButtonSegment(value: 'meal', label: Text('🍽️ Meal')), ButtonSegment(value: 'correction', label: Text('💧 Correction'))], 
               selected: {_entryType}, 
-              onSelectionChanged: (Set<String> s) => setState(() => _entryType = s.first),
+              onSelectionChanged: (Set<String> s) {
+                HapticFeedback.selectionClick(); // Feedback estilo "roda dentada"
+                setState(() => _entryType = s.first);
+              },
               style: ButtonStyle(
                 backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? Colors.white : cardDark),
                 foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? Colors.black : textMain),
@@ -116,10 +134,53 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             
             TextField(controller: tCtrl, style: const TextStyle(color: textMain), decoration: _customInputDeco('Description', '')), const SizedBox(height: 16),
             TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('Carbs', 'g')), const SizedBox(height: 16),
-            TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('Insulin', 'U')), const SizedBox(height: 32),
+            TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('Insulin', 'U')), const SizedBox(height: 24),
+            
+            const Text('Tags', style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: _availableTags.map((tag) {
+                final isSelected = _selectedTags.contains(tag);
+                return FilterChip(
+                  label: Text(tag, style: TextStyle(color: isSelected ? Colors.black : textMuted, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  selected: isSelected,
+                  selectedColor: Colors.white,
+                  backgroundColor: cardDark,
+                  checkmarkColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.white : borderDark)),
+                  onSelected: (bool selected) {
+                    HapticFeedback.lightImpact(); // Feedback ao clicar numa tag
+                    setState(() {
+                      if (selected) {
+                        _selectedTags.add(tag);
+                      } else {
+                        _selectedTags.remove(tag);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 32),
             
             ElevatedButton(
-              onPressed: () { globalDiary.insert(0, {'title': tCtrl.text.isEmpty ? 'Manual Log' : tCtrl.text, 'carbs': double.tryParse(cCtrl.text) ?? 0.0, 'insulin': double.tryParse(iCtrl.text) ?? 0.0, 'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}', 'type': _entryType, 'imagePath': null }); saveData(); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Logged!', style: TextStyle(color: Colors.black)), backgroundColor: Colors.white)); Navigator.of(context).pop(); }, 
+              onPressed: () { 
+                HapticFeedback.mediumImpact(); // Feedback mais forte para indicar sucesso a guardar
+                globalDiary.insert(0, {
+                  'title': tCtrl.text.isEmpty ? 'Manual Log' : tCtrl.text, 
+                  'carbs': double.tryParse(cCtrl.text) ?? 0.0, 
+                  'insulin': double.tryParse(iCtrl.text) ?? 0.0, 
+                  'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}', 
+                  'type': _entryType, 
+                  'imagePath': null,
+                  'tags': List<String>.from(_selectedTags) 
+                }); 
+                saveData(); 
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Logged!', style: TextStyle(color: Colors.black)), backgroundColor: Colors.white)); 
+                Navigator.of(context).pop(); 
+              }, 
               style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: cardDark, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: borderDark))),
               child: const Text('💾 Save Log', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
