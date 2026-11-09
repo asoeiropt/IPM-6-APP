@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart'; // <--- IMPORT LOTTIE ADICIONADO
+import 'package:fl_chart/fl_chart.dart';
+import 'package:lottie/lottie.dart';
 import 'dart:io';
 import '../constants.dart';
 import '../app_data.dart';
@@ -12,7 +13,14 @@ class DiaryTab extends StatefulWidget {
 }
 
 class _DiaryTabState extends State<DiaryTab> {
-  
+  final Color bgColor = const Color(0xFF090C10);
+  final Color cardColor = const Color(0xFF141923);
+  final Gradient neonGradient = const LinearGradient(
+    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], // Azul para Roxo
+  );
+
+  String _selectedTab = 'Log Meal';
+
   Map<String, double> _calculateDailyTotals() {
     double totalCarbs = 0;
     double totalInsulin = 0;
@@ -28,208 +36,276 @@ class _DiaryTabState extends State<DiaryTab> {
     final totals = _calculateDailyTotals();
 
     return Scaffold(
-      backgroundColor: bgDark,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 200.0,
-            floating: false,
-            pinned: true,
-            backgroundColor: bgDark,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-              title: const Text('📖 Event Log', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              background: Container(
-                padding: const EdgeInsets.all(20.0),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [cardDark, bgDark],
-                  )
-                ),
-                child: SafeArea(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 10),
-                      Text('Today\'s Summary', style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Total Carbs', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                                const SizedBox(height: 4),
-                                Text('${totals['carbs']?.toStringAsFixed(1)}g', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          Container(width: 1, height: 40, color: borderDark),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Total Insulin', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                                const SizedBox(height: 4),
-                                Text('${totals['insulin']?.toStringAsFixed(1)}U', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 24),
+            _buildTabSelector(),
+            const SizedBox(height: 24),
+            _buildSearchBar(),
+            const SizedBox(height: 24),
+            _buildNutritionSummaryCard(totals['carbs'] ?? 0),
+            const SizedBox(height: 24),
+            const Text('Today', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            _buildDiaryList(),
+            const SizedBox(height: 100), // Espaço para o FloatingActionButton do MainNavigator
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- CABEÇALHO ---
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Nutrition', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+            SizedBox(height: 4),
+            Text('Fuel your goals', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: cardColor,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: const Icon(Icons.alarm, color: Colors.white54, size: 20),
+        ),
+      ],
+    );
+  }
+
+  // --- ABAS (Log Meal / History) ---
+  Widget _buildTabSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          _buildTabButton('Log Meal'),
+          _buildTabButton('History'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String title) {
+    final isSelected = _selectedTab == title;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = title),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            gradient: isSelected ? neonGradient : null,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: isSelected
+                ? [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))]
+                : [],
+          ),
+          child: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white54,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
               ),
             ),
           ),
-          
-          // --- ESTADO VAZIO ANIMADO COM LOTTIE ---
-          if (globalDiary.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Lottie.network(
-                      'https://lottie.host/233076a0-5cb0-4f51-b06f-f6bb2d174780/kC6H40z2H8.json', // URL público de um Empty State
-                      width: 200,
-                      height: 200,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback caso estejas sem net ou o URL falhe
-                        return Icon(Icons.menu_book_rounded, size: 64, color: textMuted.withOpacity(0.3));
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Text('📭 Your diary is empty.', style: TextStyle(color: textMuted, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Text('Start logging your meals to see them here.', style: TextStyle(color: textMuted.withOpacity(0.5), fontSize: 12)),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.all(16.0),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == globalDiary.length) return const SizedBox(height: 80); 
-                    
-                    final item = globalDiary[index]; 
-                    final isMeal = item['type'] == 'meal';
-                    final List<dynamic>? tags = item['tags']; 
-                    
-                    final String heroTag = 'hero_icon_$index';
+        ),
+      ),
+    );
+  }
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8.0), 
-                      decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderDark)), 
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Dismissible(
-                          key: UniqueKey(),
-                          direction: DismissDirection.horizontal,
-                          
-                          background: Container(
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 20),
-                            color: accentBlue,
-                            child: const Icon(Icons.copy, color: Colors.white),
-                          ),
-                          
-                          secondaryBackground: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            color: Colors.redAccent,
-                            child: const Icon(Icons.delete_outline, color: Colors.white),
-                          ),
-                          
-                          confirmDismiss: (direction) async {
-                            if (direction == DismissDirection.startToEnd) {
-                              setState(() {
-                                final duplicatedItem = Map<String, dynamic>.from(globalDiary[index]);
-                                duplicatedItem['time'] = '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}';
-                                globalDiary.insert(0, duplicatedItem);
-                                saveData();
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('📋 Log Duplicated!'), backgroundColor: accentBlue));
-                              return false; 
-                            }
-                            return true; 
-                          },
-                          
-                          onDismissed: (direction) {
-                            if (direction == DismissDirection.endToStart) {
-                              setState(() {
-                                globalDiary.removeAt(index);
-                                saveData();
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Log Deleted'), backgroundColor: Colors.redAccent));
-                            }
-                          },
-                          
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            leading: Hero(
-                              tag: heroTag,
-                              child: Material(
-                                type: MaterialType.transparency,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8), 
-                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(8)), 
-                                  child: Icon(isMeal ? Icons.restaurant : Icons.water_drop, color: Colors.white, size: 20)
-                                ),
-                              ),
-                            ), 
-                            title: Text(item['title'], style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15, color: textMain)), 
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Text('${item['carbs']}g Carbs • ${item['insulin']}U Insulin', style: TextStyle(fontSize: 13, color: textMuted)),
-                                if (tags != null && tags.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6, runSpacing: 6,
-                                    children: tags.map<Widget>((tag) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(4), border: Border.all(color: borderDark)),
-                                      child: Text(tag.toString(), style: TextStyle(color: Colors.grey.shade300, fontSize: 10, fontWeight: FontWeight.w500)),
-                                    )).toList(),
-                                  )
-                                ]
-                              ],
-                            ), 
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(item['time'], style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: textMain, fontFamily: 'monospace')),
-                              ],
-                            ),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DiaryDetailScreen(itemIndex: index, heroTag: heroTag))).then((_) => setState(() {}))
-                          ),
-                        ),
-                      )
-                    );
-                  },
-                  childCount: globalDiary.length + 1,
+  // --- BARRA DE PESQUISA ---
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: TextField(
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: 'Search food or scan barcode',
+          hintStyle: const TextStyle(color: Colors.white38),
+          prefixIcon: const Icon(Icons.search, color: Colors.white54),
+          suffixIcon: const Icon(Icons.qr_code_scanner, color: Colors.white54),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  // --- CARTÃO DE RESUMO (Macros e Calorias) ---
+  Widget _buildNutritionSummaryCard(double dynamicCarbs) {
+    // Valores baseados na imagem
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          // Gráfico de Donut
+          SizedBox(
+            width: 120,
+            height: 120,
+            child: Stack(
+              children: [
+                PieChart(
+                  PieChartData(
+                    sectionsSpace: 0,
+                    centerSpaceRadius: 45,
+                    startDegreeOffset: -90,
+                    sections: [
+                      PieChartSectionData(color: const Color(0xFFE81CFF), value: 30, title: '', radius: 10), // Rosa
+                      PieChartSectionData(color: const Color(0xFF3B82F6), value: 50, title: '', radius: 10), // Azul (Carbs)
+                      PieChartSectionData(color: const Color(0xFF2DD4BF), value: 20, title: '', radius: 10), // Teal
+                    ],
+                  ),
                 ),
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text('428', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text('Calories', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          // Lista de Macros
+          Expanded(
+            child: Column(
+              children: [
+                _buildMacroRow(const Color(0xFFE81CFF), 'Protein', '28g'),
+                const SizedBox(height: 12),
+                _buildMacroRow(const Color(0xFF3B82F6), 'Carbs', '${dynamicCarbs > 0 ? dynamicCarbs.toStringAsFixed(0) : '149'}g'),
+                const SizedBox(height: 12),
+                _buildMacroRow(const Color(0xFF2DD4BF), 'Fats', '52g'),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacroRow(Color color, String name, String amount) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.stop_circle_outlined, color: color, size: 16),
+            const SizedBox(width: 8),
+            Text(name, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          ],
+        ),
+        Text(amount, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  // --- LISTA DE REFEIÇÕES ---
+  Widget _buildDiaryList() {
+    if (globalDiary.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Column(
+            children: [
+              Lottie.network(
+                'https://lottie.host/233076a0-5cb0-4f51-b06f-f6bb2d174780/kC6H40z2H8.json',
+                width: 150, height: 150,
+                errorBuilder: (context, error, stackTrace) => Icon(Icons.restaurant, size: 64, color: textMuted.withOpacity(0.3)),
+              ),
+              const SizedBox(height: 16),
+              const Text('No meals logged yet.', style: TextStyle(color: Colors.white54, fontSize: 14)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: globalDiary.length,
+        separatorBuilder: (context, index) => Divider(color: Colors.white.withOpacity(0.05), height: 1, indent: 70),
+        itemBuilder: (context, index) {
+          final item = globalDiary[index];
+          final String? imgPath = item['imagePath'];
+          final String heroTag = 'hero_icon_$index';
+
+          return InkWell(
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DiaryDetailScreen(itemIndex: index, heroTag: heroTag))).then((_) => setState(() {})),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Hero(
+                    tag: heroTag,
+                    child: CircleAvatar(
+                      radius: 24,
+                      backgroundColor: Colors.white.withOpacity(0.05),
+                      backgroundImage: imgPath != null ? FileImage(File(imgPath)) : null,
+                      child: imgPath == null ? const Icon(Icons.restaurant, color: Colors.white54) : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item['title'], style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('${item['time']} - ${item['carbs']}g carbs', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                ],
               ),
             ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
+// ==========================================
+// ECRÃ DE EDIÇÃO E DETALHE DO DIÁRIO INTACTO
+// ==========================================
 class DiaryDetailScreen extends StatefulWidget {
   final int itemIndex; 
   final String heroTag;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // <--- IMPORTANTE PARA AS VIBRAÇÕES
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -21,6 +21,12 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   late String _entryType; 
   bool _isLoadingBarcode = false; 
 
+  final Color bgColor = const Color(0xFF090C10);
+  final Color cardColor = const Color(0xFF141923);
+  final Gradient neonGradient = const LinearGradient(
+    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
+  );
+
   final List<String> _availableTags = ['🏋️ Pós-Treino', '🤒 Doente', '😤 Stress', '🏃 Ativo'];
   final List<String> _selectedTags = [];
 
@@ -31,20 +37,25 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   }
 
   @override
-  void dispose() { tCtrl.dispose(); cCtrl.dispose(); iCtrl.dispose(); super.dispose(); }
+  void dispose() { 
+    tCtrl.dispose(); 
+    cCtrl.dispose(); 
+    iCtrl.dispose(); 
+    super.dispose(); 
+  }
 
   Future<void> _scanBarcode() async {
-    // Vibração ao abrir o scanner
     HapticFeedback.lightImpact();
     try {
       String? barcodeScanRes = await Navigator.push<String>(
         context,
         MaterialPageRoute(
           builder: (context) => Scaffold(
+            backgroundColor: bgColor,
             appBar: AppBar(
-              title: const Text('Digitalizar Código', style: TextStyle(color: textMain, fontSize: 16)),
-              backgroundColor: cardDark,
-              iconTheme: const IconThemeData(color: textMain),
+              title: const Text('Digitalizar Código', style: TextStyle(color: Colors.white, fontSize: 16)),
+              backgroundColor: cardColor,
+              iconTheme: const IconThemeData(color: Colors.white),
             ),
             body: MobileScanner(
               onDetect: (capture) {
@@ -52,7 +63,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                 if (barcodes.isNotEmpty) {
                   final String? code = barcodes.first.rawValue;
                   if (code != null) {
-                    HapticFeedback.mediumImpact(); // Vibra quando deteta o código!
+                    HapticFeedback.mediumImpact();
                     Navigator.pop(context, code);
                   }
                 }
@@ -75,9 +86,9 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               cCtrl.text = (double.tryParse((product['nutriments']?['carbohydrates_100g'] ?? 0).toString()) ?? 0.0).toStringAsFixed(1); 
               iCtrl.text = ((double.tryParse(cCtrl.text) ?? 0) / globalIcr).toStringAsFixed(1); 
             });
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Product fetched!', style: TextStyle(color: Colors.black)), backgroundColor: Colors.greenAccent));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Product fetched!'), backgroundColor: Color(0xFF2DD4BF)));
           } else {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Product not found.', style: TextStyle(color: Colors.black)), backgroundColor: Colors.orangeAccent));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Product not found.'), backgroundColor: Colors.orangeAccent));
           }
         }
       }
@@ -90,53 +101,118 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
   InputDecoration _customInputDeco(String label, String suffix) {
     return InputDecoration(
-      labelText: label, labelStyle: TextStyle(color: textMuted, fontSize: 14),
-      suffixText: suffix, suffixStyle: TextStyle(color: textMuted),
-      filled: true, fillColor: cardDark,
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderDark)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white)),
+      labelText: label, 
+      labelStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+      suffixText: suffix, 
+      suffixStyle: const TextStyle(color: Colors.white54),
+      filled: true, 
+      fillColor: cardColor,
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.05))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgDark,
-      appBar: AppBar(title: const Text('✍️ Log Entry', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textMain)), backgroundColor: cardDark, elevation: 0, shape: Border(bottom: BorderSide(color: borderDark, width: 1)), iconTheme: const IconThemeData(color: textMain)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
           children: [
-            SegmentedButton<String>(
-              segments: const [ButtonSegment(value: 'meal', label: Text('🍽️ Meal')), ButtonSegment(value: 'correction', label: Text('💧 Correction'))], 
-              selected: {_entryType}, 
-              onSelectionChanged: (Set<String> s) {
-                HapticFeedback.selectionClick(); // Feedback estilo "roda dentada"
-                setState(() => _entryType = s.first);
-              },
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? Colors.white : cardDark),
-                foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? Colors.black : textMain),
-                side: WidgetStateProperty.all(BorderSide(color: borderDark))
+            // --- CABEÇALHO ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Log Entry', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: const Icon(Icons.edit_note, color: Colors.white54, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // --- SELETOR DE TIPO (MEAL / CORRECTION) EM FORMATO DE PÍLULA ---
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(30),
               ),
-            ), 
+              child: Row(
+                children: [
+                  _buildTypeTab('meal', '🍽️ Meal'),
+                  _buildTypeTab('correction', '💧 Correction'),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
             
-            ElevatedButton.icon(
-              onPressed: _isLoadingBarcode ? null : _scanBarcode,
-              icon: _isLoadingBarcode ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Icon(Icons.qr_code_scanner, size: 18),
-              label: Text(_isLoadingBarcode ? '🔍 Scanning DB...' : '🔍 Scan Barcode', style: const TextStyle(fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            // --- BOTÃO DE SCANNER ---
+            GestureDetector(
+              onTap: _isLoadingBarcode ? null : _scanBarcode,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _isLoadingBarcode 
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.qr_code_scanner, color: Color(0xFF3B82F6), size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      _isLoadingBarcode ? 'Scanning DB...' : 'Scan Barcode', 
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)
+                    ),
+                  ],
+                ),
+              ),
             ),
             
-            Padding(padding: const EdgeInsets.symmetric(vertical: 24.0), child: Row(children: [Expanded(child: Divider(color: borderDark)), Padding(padding: const EdgeInsets.symmetric(horizontal: 12.0), child: Text('✍️ MANUAL', style: TextStyle(color: textMuted, fontSize: 10, letterSpacing: 1.2))), Expanded(child: Divider(color: borderDark))])),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(child: Divider(color: Colors.white.withOpacity(0.05))),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12.0), 
+                  child: Text('OR MANUAL ENTRY', style: TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 1.2))
+                ),
+                Expanded(child: Divider(color: Colors.white.withOpacity(0.05))),
+              ],
+            ),
+            const SizedBox(height: 24),
             
-            TextField(controller: tCtrl, style: const TextStyle(color: textMain), decoration: _customInputDeco('Description', '')), const SizedBox(height: 16),
-            TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('Carbs', 'g')), const SizedBox(height: 16),
-            TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('Insulin', 'U')), const SizedBox(height: 24),
+            // --- CAMPOS DE TEXTO ---
+            TextField(controller: tCtrl, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Description', '')), 
+            const SizedBox(height: 16),
+            TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Carbs', 'g')), 
+            const SizedBox(height: 16),
+            TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Insulin', 'U')), 
+            const SizedBox(height: 24),
             
-            const Text('Tags', style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.w600)),
+            // --- TAGS ---
+            const Text('Tags', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8.0,
@@ -144,14 +220,17 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               children: _availableTags.map((tag) {
                 final isSelected = _selectedTags.contains(tag);
                 return FilterChip(
-                  label: Text(tag, style: TextStyle(color: isSelected ? Colors.black : textMuted, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  label: Text(tag, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                   selected: isSelected,
-                  selectedColor: Colors.white,
-                  backgroundColor: cardDark,
-                  checkmarkColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.white : borderDark)),
+                  selectedColor: const Color(0xFF3B82F6),
+                  backgroundColor: cardColor,
+                  checkmarkColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20), 
+                    side: BorderSide(color: isSelected ? Colors.transparent : Colors.white.withOpacity(0.05))
+                  ),
                   onSelected: (bool selected) {
-                    HapticFeedback.lightImpact(); // Feedback ao clicar numa tag
+                    HapticFeedback.lightImpact();
                     setState(() {
                       if (selected) {
                         _selectedTags.add(tag);
@@ -163,11 +242,12 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
             
-            ElevatedButton(
-              onPressed: () { 
-                HapticFeedback.mediumImpact(); // Feedback mais forte para indicar sucesso a guardar
+            // --- BOTÃO GUARDAR ---
+            GestureDetector(
+              onTap: () { 
+                HapticFeedback.mediumImpact(); 
                 globalDiary.insert(0, {
                   'title': tCtrl.text.isEmpty ? 'Manual Log' : tCtrl.text, 
                   'carbs': double.tryParse(cCtrl.text) ?? 0.0, 
@@ -178,13 +258,55 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                   'tags': List<String>.from(_selectedTags) 
                 }); 
                 saveData(); 
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Logged!', style: TextStyle(color: Colors.black)), backgroundColor: Colors.white)); 
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Logged!'), backgroundColor: Color(0xFF2DD4BF))); 
                 Navigator.of(context).pop(); 
               }, 
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), backgroundColor: cardDark, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: borderDark))),
-              child: const Text('💾 Save Log', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(
+                  gradient: neonGradient,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: const Center(
+                  child: Text('Save Log', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
             ),
+            const SizedBox(height: 40),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Widget auxiliar para os separadores em pílula
+  Widget _buildTypeTab(String typeValue, String label) {
+    final isSelected = _entryType == typeValue;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _entryType = typeValue);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            gradient: isSelected ? neonGradient : null,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white54,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
         ),
       ),
     );

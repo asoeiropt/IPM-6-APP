@@ -5,7 +5,7 @@ import 'constants.dart';
 import 'app_data.dart';
 import 'screens/home_screen.dart';
 import 'screens/diary_screen.dart';
-import 'screens/care_screen.dart'; // <--- O teu ecrã Care importado
+import 'screens/care_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/manual_entry_screen.dart';
