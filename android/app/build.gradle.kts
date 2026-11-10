@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.smart_glyco_ai"
-        minSdk = flutter.minSdkVersion // <-- MUDA ISTO PARA 21 (Obrigatório para a câmara)
+        minSdk = 26// <-- MUDA ISTO PARA 21 (Obrigatório para a câmara)
         targetSdk = 36 // <-- MUDA ISTO PARA 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName

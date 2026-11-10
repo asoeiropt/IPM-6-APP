@@ -215,13 +215,13 @@ class _MainNavigatorState extends State<MainNavigator> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: const LinearGradient(
-            colors: [Color(0xFF3B82F6), Color(0xFFA855F7)], 
+            colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], // Gradiente Neon da App
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF8B5CF6).withOpacity(0.5),
+              color: const Color(0xFF3B82F6).withOpacity(0.4),
               blurRadius: 15,
               spreadRadius: 2,
               offset: const Offset(0, 4),
@@ -233,34 +233,63 @@ class _MainNavigatorState extends State<MainNavigator> {
           elevation: 0, 
           icon: Icons.add,
           activeIcon: Icons.close,
-          spacing: 12,
+          spacing: 16,
           spaceBetweenChildren: 12,
           foregroundColor: Colors.white, 
-          overlayColor: Colors.black,
-          overlayOpacity: 0.7,
+          overlayColor: const Color(0xFF090C10), // Fundo principal da App
+          overlayOpacity: 0.85, // Escurece um pouco mais o fundo
           shape: const CircleBorder(),
           children: [
             SpeedDialChild(
-              child: const Icon(Icons.camera_alt_outlined, color: Colors.black),
-              backgroundColor: Colors.white,
+              child: const Icon(Icons.camera_alt_outlined, color: Colors.white),
+              backgroundColor: const Color(0xFF3B82F6), // Azul forte
+              shape: const CircleBorder(), // Ícone redondo
               labelWidget: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                child: const Text('📸 Analyze Meal', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                margin: const EdgeInsets.only(right: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)]), 
+                  borderRadius: BorderRadius.circular(16), // Label Arredondada
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))
+                  ]
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text('Analyze Meal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
               ),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CameraScreen())),
             ),
             SpeedDialChild(
               child: const Icon(Icons.edit_note, color: Colors.white),
-              backgroundColor: cardDark,
+              backgroundColor: const Color(0xFF141923), // CardColor da app
+              shape: const CircleBorder(),
               labelWidget: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(color: cardDark, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderDark)),
-                child: const Text('📝 Manual Entry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                margin: const EdgeInsets.only(right: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141923),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit, color: Colors.white70, size: 16),
+                    SizedBox(width: 8),
+                    Text('Manual Entry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                  ],
+                ),
               ),
-              onTap: () async { await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManualEntryScreen())); setState(() {}); },
+              onTap: () async { 
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManualEntryScreen())); 
+                setState(() {}); 
+              },
             ),
           ],
         ),
