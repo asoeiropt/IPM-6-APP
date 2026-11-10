@@ -5,7 +5,7 @@ import 'constants.dart';
 import 'app_data.dart';
 import 'screens/home_screen.dart';
 import 'screens/diary_screen.dart';
-import 'screens/care_screen.dart';
+import 'screens/care_screen.dart'; 
 import 'screens/profile_screen.dart';
 import 'screens/camera_screen.dart';
 import 'screens/manual_entry_screen.dart';
@@ -20,7 +20,6 @@ class MainNavigator extends StatefulWidget {
 class _MainNavigatorState extends State<MainNavigator> {
   int _currentIndex = 0; 
   
-  // As tuas 4 páginas principais
   Widget get _currentScreen => [
     const HomeTab(), 
     const DiaryTab(), 
@@ -75,7 +74,6 @@ class _MainNavigatorState extends State<MainNavigator> {
     );
   }
 
-  // --- BOTÃO DA BARRA INFERIOR ---
   Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
     final isSelected = _currentIndex == index;
     final color = isSelected ? Colors.white : const Color(0xFF64748B);
@@ -128,14 +126,17 @@ class _MainNavigatorState extends State<MainNavigator> {
 
   @override
   Widget build(BuildContext context) {
+    // AQUI ESTÁ A COR UNIFICADA QUE REMOVE A DIVISÃO DO TOPO
+    const Color unifiedBg = Color(0xFF090C10);
+
     return Scaffold(
       extendBody: true, 
-      backgroundColor: bgDark,
+      backgroundColor: unifiedBg,
       
       appBar: AppBar(
-        backgroundColor: bgDark,
+        backgroundColor: unifiedBg,
         elevation: 0,
-        shape: Border(bottom: BorderSide(color: borderDark, width: 1)),
+        // Removi o "shape: Border(...)" para que o fundo se misture perfeitamente sem linhas!
         centerTitle: false,
         title: const Text(
           'Olá, João 👋', 
@@ -210,12 +211,11 @@ class _MainNavigatorState extends State<MainNavigator> {
         ),
       ),
       
-      // --- NOVO BOTÃO FLUTUANTE COM GRADIENTE ---
       floatingActionButton: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: const LinearGradient(
-            colors: [Color(0xFF3B82F6), Color(0xFFA855F7)], // Azul para Roxo vibrante
+            colors: [Color(0xFF3B82F6), Color(0xFFA855F7)], 
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -229,13 +229,13 @@ class _MainNavigatorState extends State<MainNavigator> {
           ],
         ),
         child: SpeedDial(
-          backgroundColor: Colors.transparent, // Transparente para o gradiente de trás aparecer
-          elevation: 0, // Tirar a sombra padrão do botão (já temos a do Container)
+          backgroundColor: Colors.transparent, 
+          elevation: 0, 
           icon: Icons.add,
           activeIcon: Icons.close,
           spacing: 12,
           spaceBetweenChildren: 12,
-          foregroundColor: Colors.white, // Ícone do "+" a branco
+          foregroundColor: Colors.white, 
           overlayColor: Colors.black,
           overlayOpacity: 0.7,
           shape: const CircleBorder(),

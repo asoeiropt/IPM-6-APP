@@ -121,7 +121,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            // --- CABEÇALHO ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -148,7 +147,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             ),
             const SizedBox(height: 24),
 
-            // --- SELETOR DE TIPO (MEAL / CORRECTION) EM FORMATO DE PÍLULA ---
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -164,54 +162,34 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             ),
             const SizedBox(height: 24),
             
-            // --- BOTÃO DE SCANNER ---
-            GestureDetector(
-              onTap: _isLoadingBarcode ? null : _scanBarcode,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+            // --- A NOVA BARRA DE PESQUISA / SCANNER DE CÓDIGO ---
+            TextField(
+              controller: tCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search food or scan barcode',
+                hintStyle: const TextStyle(color: Colors.white38),
+                prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                suffixIcon: IconButton(
+                  icon: _isLoadingBarcode 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
+                      : const Icon(Icons.qr_code_scanner, color: Colors.white54),
+                  onPressed: _isLoadingBarcode ? null : _scanBarcode,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _isLoadingBarcode 
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.qr_code_scanner, color: Color(0xFF3B82F6), size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      _isLoadingBarcode ? 'Scanning DB...' : 'Scan Barcode', 
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)
-                    ),
-                  ],
-                ),
+                filled: true,
+                fillColor: cardColor,
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: Colors.white.withOpacity(0.05))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
             ),
-            
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: Divider(color: Colors.white.withOpacity(0.05))),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12.0), 
-                  child: Text('OR MANUAL ENTRY', style: TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 1.2))
-                ),
-                Expanded(child: Divider(color: Colors.white.withOpacity(0.05))),
-              ],
-            ),
-            const SizedBox(height: 24),
-            
-            // --- CAMPOS DE TEXTO ---
-            TextField(controller: tCtrl, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Description', '')), 
             const SizedBox(height: 16),
+            
             TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Carbs', 'g')), 
             const SizedBox(height: 16),
             TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Insulin', 'U')), 
             const SizedBox(height: 24),
             
-            // --- TAGS ---
             const Text('Tags', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Wrap(
@@ -244,7 +222,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             ),
             const SizedBox(height: 40),
             
-            // --- BOTÃO GUARDAR ---
             GestureDetector(
               onTap: () { 
                 HapticFeedback.mediumImpact(); 
@@ -283,7 +260,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     );
   }
 
-  // Widget auxiliar para os separadores em pílula
   Widget _buildTypeTab(String typeValue, String label) {
     final isSelected = _entryType == typeValue;
     return Expanded(

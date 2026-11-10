@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'trends_screen.dart'; 
 import 'medication_screen.dart'; 
-import 'activity_screen.dart';
+import 'activity_screen.dart'; 
 import 'report_screen.dart';
 
 class HomeTab extends StatelessWidget {
@@ -10,7 +10,8 @@ class HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFF121418);
+    // AQUI ESTÁ A COR UNIFICADA PARA TODA A APP
+    const bgColor = Color(0xFF090C10);
     
     return Scaffold(
       backgroundColor: bgColor,
@@ -138,7 +139,7 @@ class HomeTab extends StatelessWidget {
                     subtitle: 'steps',
                     icon: Icons.local_fire_department,
                     gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF3B6EEA), Color(0xFF1E45A8)]),
-                    onTap: () { // <--- LIGAÇÃO FEITA AQUI
+                    onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const ActivityScreen()));
                     },
                   ),
@@ -148,7 +149,7 @@ class HomeTab extends StatelessWidget {
                     subtitle: '& patterns',
                     icon: Icons.insert_drive_file_outlined,
                     gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFD29C46), Color(0xFF9E6B22)]),
-                    onTap: () { // <--- LIGAÇÃO FEITA AQUI
+                    onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportScreen()));
                     },
                   ),

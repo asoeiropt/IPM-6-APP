@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'personal_info_screen.dart'; 
+import 'health_settings_screen.dart';
+import 'data_privacy_screen.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Cores baseadas no teu novo design dark mode
     const bgColor = Color(0xFF090C10);
     const cardColor = Color(0xFF141923);
     const neonGradient = LinearGradient(
-      colors: [Color(0xFF3B82F6), Color(0xFFE81CFF)], // Gradiente Azul para Rosa/Roxo do Log Out
+      colors: [Color(0xFF3B82F6), Color(0xFFE81CFF)], 
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
     );
@@ -20,7 +23,6 @@ class ProfileTab extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // --- CABEÇALHO DA PÁGINA ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -38,7 +40,6 @@ class ProfileTab extends StatelessWidget {
             ),
             const SizedBox(height: 32),
 
-            // --- INFO DO UTILIZADOR (FOTO E NOME) ---
             Row(
               children: [
                 Stack(
@@ -55,7 +56,7 @@ class ProfileTab extends StatelessWidget {
                         width: 16,
                         height: 16,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00E676), // Ponto verde brilhante
+                          color: const Color(0xFF00E676), 
                           shape: BoxShape.circle,
                           border: Border.all(color: bgColor, width: 3),
                         ),
@@ -76,7 +77,6 @@ class ProfileTab extends StatelessWidget {
             ),
             const SizedBox(height: 32),
 
-            // --- BLOCO DE MENUS ---
             Container(
               decoration: BoxDecoration(
                 color: cardColor,
@@ -85,24 +85,46 @@ class ProfileTab extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildMenuItem(Icons.person_outline, 'Personal Information', isFirst: true),
+                  _buildMenuItem(
+                    icon: Icons.person_outline, 
+                    title: 'Personal Information', 
+                    isFirst: true,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const PersonalInfoScreen()));
+                    }
+                  ),
                   _buildDivider(),
-                  _buildMenuItem(Icons.health_and_safety_outlined, 'Health Settings'),
+                  _buildMenuItem(
+                    icon: Icons.health_and_safety_outlined, 
+                    title: 'Health Settings',
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const HealthSettingsScreen()));
+                    }
+                  ),
                   _buildDivider(),
-                  _buildMenuItem(Icons.link, 'Connected Devices', trailingText: 'Dexcom G7'),
+                  _buildMenuItem(icon: Icons.link, title: 'Connected Devices', trailingText: 'Dexcom G7'),
                   _buildDivider(),
-                  _buildMenuItem(Icons.shield_outlined, 'Data & Privacy'),
+                  _buildMenuItem(
+                    icon: Icons.shield_outlined, 
+                    title: 'Data & Privacy',
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const DataPrivacyScreen()));
+                    }
+                  ),
                   _buildDivider(),
-                  _buildMenuItem(Icons.help_outline, 'Help & Support', isLast: true),
+                  _buildMenuItem(icon: Icons.help_outline, title: 'Help & Support', isLast: true),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // --- BOTÃO LOG OUT ---
             GestureDetector(
               onTap: () {
-                // Lógica de logout (por exemplo, voltar ao ecrã de login)
+                HapticFeedback.mediumImpact();
+                // Lógica de logout
               },
               child: Container(
                 width: double.infinity,
@@ -120,17 +142,17 @@ class ProfileTab extends StatelessWidget {
               ),
             ),
             
-            const SizedBox(height: 100), // Espaçamento extra para a barra flutuante
+            const SizedBox(height: 100), 
           ],
         ),
       ),
     );
   }
 
-  // --- WIDGET PARA OS ITENS DO MENU ---
-  Widget _buildMenuItem(IconData icon, String title, {String? trailingText, bool isFirst = false, bool isLast = false}) {
+  // ATUALIZADO: Agora recebe um onTap opcional
+  Widget _buildMenuItem({required IconData icon, required String title, String? trailingText, bool isFirst = false, bool isLast = false, VoidCallback? onTap}) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap ?? () {},
       borderRadius: BorderRadius.vertical(
         top: Radius.circular(isFirst ? 24 : 0),
         bottom: Radius.circular(isLast ? 24 : 0),
@@ -156,12 +178,11 @@ class ProfileTab extends StatelessWidget {
     );
   }
 
-  // --- WIDGET PARA O TRAÇO DIVISÓRIO ---
   Widget _buildDivider() {
     return Divider(
       color: Colors.white.withOpacity(0.05),
       height: 1,
-      indent: 58, // Para alinhar o traço pelo texto e não pelo ícone
+      indent: 58, 
       endIndent: 20,
     );
   }

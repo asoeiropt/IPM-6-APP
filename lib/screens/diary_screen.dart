@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:lottie/lottie.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:io';
 import '../constants.dart';
 import '../app_data.dart';
@@ -16,10 +20,11 @@ class _DiaryTabState extends State<DiaryTab> {
   final Color bgColor = const Color(0xFF090C10);
   final Color cardColor = const Color(0xFF141923);
   final Gradient neonGradient = const LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], // Azul para Roxo
+    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
   );
 
   String _selectedTab = 'Log Meal';
+  bool _isLoadingBarcode = false;
 
   Map<String, double> _calculateDailyTotals() {
     double totalCarbs = 0;
@@ -29,6 +34,73 @@ class _DiaryTabState extends State<DiaryTab> {
       totalInsulin += (item['insulin'] as num).toDouble();
     }
     return {'carbs': totalCarbs, 'insulin': totalInsulin};
+  }
+
+  // --- LÓGICA DE DIGITALIZAR CÓDIGO NO DIÁRIO ---
+  Future<void> _scanBarcode() async {
+    HapticFeedback.lightImpact();
+    try {
+      String? barcodeScanRes = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            backgroundColor: bgColor,
+            appBar: AppBar(
+              title: const Text('Digitalizar Código', style: TextStyle(color: Colors.white, fontSize: 16)),
+              backgroundColor: cardColor,
+              iconTheme: const IconThemeData(color: Colors.white),
+            ),
+            body: MobileScanner(
+              onDetect: (capture) {
+                final List<Barcode> barcodes = capture.barcodes;
+                if (barcodes.isNotEmpty) {
+                  final String? code = barcodes.first.rawValue;
+                  if (code != null) {
+                    HapticFeedback.mediumImpact();
+                    Navigator.pop(context, code);
+                  }
+                }
+              },
+            ),
+          ),
+        ),
+      );
+
+      if (barcodeScanRes != null && barcodeScanRes != '-1' && barcodeScanRes.isNotEmpty) {
+        setState(() { _isLoadingBarcode = true; });
+        final url = Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcodeScanRes.json');
+        final response = await http.get(url);
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['status'] == 1) { 
+            final product = data['product'];
+            double carbs = double.tryParse((product['nutriments']?['carbohydrates_100g'] ?? 0).toString()) ?? 0.0;
+            double insulin = carbs / globalIcr;
+            
+            setState(() {
+              globalDiary.insert(0, {
+                'title': product['product_name'] ?? 'Unknown Product',
+                'carbs': carbs,
+                'insulin': insulin,
+                'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+                'type': 'meal',
+                'imagePath': null,
+                'tags': []
+              });
+            });
+            saveData();
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Meal Logged!'), backgroundColor: Color(0xFF2DD4BF)));
+          } else {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Product not found.'), backgroundColor: Colors.orangeAccent));
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.redAccent));
+    } finally {
+      if (mounted) setState(() { _isLoadingBarcode = false; });
+    }
   }
 
   @override
@@ -45,21 +117,29 @@ class _DiaryTabState extends State<DiaryTab> {
             const SizedBox(height: 24),
             _buildTabSelector(),
             const SizedBox(height: 24),
-            _buildSearchBar(),
-            const SizedBox(height: 24),
-            _buildNutritionSummaryCard(totals['carbs'] ?? 0),
-            const SizedBox(height: 24),
-            const Text('Today', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+            
+            // --- CONDIÇÃO PARA MOSTRAR OS DADOS SÓ NO "LOG MEAL" ---
+            if (_selectedTab == 'Log Meal') ...[
+              _buildSearchBar(),
+              const SizedBox(height: 24),
+              _buildNutritionSummaryCard(totals['carbs'] ?? 0),
+              const SizedBox(height: 24),
+              const Text('Today', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+            ] else ...[
+              // Se for "History", mostra só este título e a lista a seguir
+              const Text('All History', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+            ],
+
             _buildDiaryList(),
-            const SizedBox(height: 100), // Espaço para o FloatingActionButton do MainNavigator
+            const SizedBox(height: 100), 
           ],
         ),
       ),
     );
   }
 
-  // --- CABEÇALHO ---
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -85,7 +165,6 @@ class _DiaryTabState extends State<DiaryTab> {
     );
   }
 
-  // --- ABAS (Log Meal / History) ---
   Widget _buildTabSelector() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -106,7 +185,10 @@ class _DiaryTabState extends State<DiaryTab> {
     final isSelected = _selectedTab == title;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = title),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _selectedTab = title);
+        },
         behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -132,7 +214,6 @@ class _DiaryTabState extends State<DiaryTab> {
     );
   }
 
-  // --- BARRA DE PESQUISA ---
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
@@ -146,7 +227,12 @@ class _DiaryTabState extends State<DiaryTab> {
           hintText: 'Search food or scan barcode',
           hintStyle: const TextStyle(color: Colors.white38),
           prefixIcon: const Icon(Icons.search, color: Colors.white54),
-          suffixIcon: const Icon(Icons.qr_code_scanner, color: Colors.white54),
+          suffixIcon: IconButton(
+            icon: _isLoadingBarcode 
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
+                : const Icon(Icons.qr_code_scanner, color: Colors.white54),
+            onPressed: _isLoadingBarcode ? null : _scanBarcode,
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
         ),
@@ -154,9 +240,7 @@ class _DiaryTabState extends State<DiaryTab> {
     );
   }
 
-  // --- CARTÃO DE RESUMO (Macros e Calorias) ---
   Widget _buildNutritionSummaryCard(double dynamicCarbs) {
-    // Valores baseados na imagem
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -166,7 +250,6 @@ class _DiaryTabState extends State<DiaryTab> {
       ),
       child: Row(
         children: [
-          // Gráfico de Donut
           SizedBox(
             width: 120,
             height: 120,
@@ -178,9 +261,9 @@ class _DiaryTabState extends State<DiaryTab> {
                     centerSpaceRadius: 45,
                     startDegreeOffset: -90,
                     sections: [
-                      PieChartSectionData(color: const Color(0xFFE81CFF), value: 30, title: '', radius: 10), // Rosa
-                      PieChartSectionData(color: const Color(0xFF3B82F6), value: 50, title: '', radius: 10), // Azul (Carbs)
-                      PieChartSectionData(color: const Color(0xFF2DD4BF), value: 20, title: '', radius: 10), // Teal
+                      PieChartSectionData(color: const Color(0xFFE81CFF), value: 30, title: '', radius: 10), 
+                      PieChartSectionData(color: const Color(0xFF3B82F6), value: 50, title: '', radius: 10), 
+                      PieChartSectionData(color: const Color(0xFF2DD4BF), value: 20, title: '', radius: 10), 
                     ],
                   ),
                 ),
@@ -197,7 +280,6 @@ class _DiaryTabState extends State<DiaryTab> {
             ),
           ),
           const SizedBox(width: 24),
-          // Lista de Macros
           Expanded(
             child: Column(
               children: [
@@ -230,7 +312,6 @@ class _DiaryTabState extends State<DiaryTab> {
     );
   }
 
-  // --- LISTA DE REFEIÇÕES ---
   Widget _buildDiaryList() {
     if (globalDiary.isEmpty) {
       return Center(
@@ -241,7 +322,7 @@ class _DiaryTabState extends State<DiaryTab> {
               Lottie.network(
                 'https://lottie.host/233076a0-5cb0-4f51-b06f-f6bb2d174780/kC6H40z2H8.json',
                 width: 150, height: 150,
-                errorBuilder: (context, error, stackTrace) => Icon(Icons.restaurant, size: 64, color: textMuted.withOpacity(0.3)),
+                errorBuilder: (context, error, stackTrace) => Icon(Icons.restaurant, size: 64, color: Colors.white.withOpacity(0.3)),
               ),
               const SizedBox(height: 16),
               const Text('No meals logged yet.', style: TextStyle(color: Colors.white54, fontSize: 14)),
@@ -339,11 +420,11 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
     showDialog(
       context: context, 
       builder: (ctx) => AlertDialog(
-        backgroundColor: cardDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderDark)),
-        title: const Text('🗑️ Delete Log?', style: TextStyle(color: textMain)), 
-        content: Text('This action cannot be undone.', style: TextStyle(color: textMuted)), 
+        backgroundColor: const Color(0xFF141923), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.white.withOpacity(0.05))),
+        title: const Text('🗑️ Delete Log?', style: TextStyle(color: Colors.white)), 
+        content: const Text('This action cannot be undone.', style: TextStyle(color: Colors.white54)), 
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: textMuted))), 
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))), 
           ElevatedButton(onPressed: () { globalDiary.removeAt(widget.itemIndex); saveData(); Navigator.pop(ctx); Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🗑️ Deleted', style: TextStyle(color: Colors.white)), backgroundColor: Colors.redAccent)); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, elevation: 0), child: const Text('Delete'))
         ]
       )
@@ -352,10 +433,10 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
 
   InputDecoration _customInputDeco(String label, String suffix) {
     return InputDecoration(
-      labelText: label, labelStyle: TextStyle(color: textMuted, fontSize: 14),
-      suffixText: suffix, suffixStyle: TextStyle(color: textMuted),
-      filled: true, fillColor: bgDark,
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderDark)),
+      labelText: label, labelStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+      suffixText: suffix, suffixStyle: const TextStyle(color: Colors.white54),
+      filled: true, fillColor: const Color(0xFF090C10),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withOpacity(0.05))),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white)),
     );
   }
@@ -366,8 +447,8 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
     final String? img = item['imagePath'];
     
     return Scaffold(
-      backgroundColor: bgDark,
-      appBar: AppBar(title: const Text('📝 Edit Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textMain)), backgroundColor: cardDark, elevation: 0, shape: Border(bottom: BorderSide(color: borderDark, width: 1)), iconTheme: const IconThemeData(color: textMain), actions: [IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: _deleteRecord)]),
+      backgroundColor: const Color(0xFF090C10),
+      appBar: AppBar(title: const Text('📝 Edit Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)), backgroundColor: const Color(0xFF141923), elevation: 0, shape: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05), width: 1)), iconTheme: const IconThemeData(color: Colors.white), actions: [IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: _deleteRecord)]),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -377,7 +458,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
                 type: MaterialType.transparency,
                 child: img != null 
                   ? SizedBox(width: double.infinity, height: 250, child: Image.file(File(img), fit: BoxFit.cover)) 
-                  : Container(width: double.infinity, height: 150, color: cardDark, child: Icon(item['type'] == 'meal' ? Icons.restaurant : Icons.water_drop, size: 40, color: textMuted.withOpacity(0.2))),
+                  : Container(width: double.infinity, height: 150, color: const Color(0xFF141923), child: Icon(item['type'] == 'meal' ? Icons.restaurant : Icons.water_drop, size: 40, color: Colors.white.withOpacity(0.2))),
               ),
             ),
             Padding(
@@ -385,12 +466,12 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch, 
                 children: [
-                  TextField(controller: hCtrl, style: const TextStyle(color: textMain), decoration: _customInputDeco('🕐 Time', '')), const SizedBox(height: 16), 
-                  TextField(controller: tCtrl, style: const TextStyle(color: textMain), decoration: _customInputDeco('📝 Description', '')), const SizedBox(height: 16), 
-                  TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('🍞 Carbs', 'g')), const SizedBox(height: 16), 
-                  TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: textMain), decoration: _customInputDeco('💉 Insulin', 'U')), const SizedBox(height: 24), 
+                  TextField(controller: hCtrl, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('🕐 Time', '')), const SizedBox(height: 16), 
+                  TextField(controller: tCtrl, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('📝 Description', '')), const SizedBox(height: 16), 
+                  TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('🍞 Carbs', 'g')), const SizedBox(height: 16), 
+                  TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('💉 Insulin', 'U')), const SizedBox(height: 24), 
                   
-                  const Text('Tags', style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Text('Tags', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8.0,
@@ -398,12 +479,12 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
                     children: _availableTags.map((tag) {
                       final isSelected = _selectedTags.contains(tag);
                       return FilterChip(
-                        label: Text(tag, style: TextStyle(color: isSelected ? Colors.black : textMuted, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                        label: Text(tag, style: TextStyle(color: isSelected ? Colors.black : Colors.white54, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                         selected: isSelected,
                         selectedColor: Colors.white,
-                        backgroundColor: bgDark,
+                        backgroundColor: const Color(0xFF090C10),
                         checkmarkColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.white : borderDark)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.white : Colors.white.withOpacity(0.05))),
                         onSelected: (bool selected) {
                           setState(() {
                             if (selected) {
