@@ -14,12 +14,12 @@ class ReportScreen extends StatefulWidget {
 
 class _ReportScreenState extends State<ReportScreen> {
   final Color bgColor = const Color(0xFF090C10);
+  final Color cardColor = const Color(0xFF141923);
 
-  // Função central que constrói a estrutura do PDF
+  // --- LÓGICA DE PDF MANTIDA INTACTA ---
   Future<Uint8List> _generateMedicalReport(PdfPageFormat format) async {
     final pdf = pw.Document(version: PdfVersion.pdf_1_5, compress: true);
     
-    // Calcula totais reais para o resumo (baseado no globalDiary)
     double totalCarbs = 0;
     double totalInsulin = 0;
     int entriesCount = globalDiary.length;
@@ -38,12 +38,9 @@ class _ReportScreenState extends State<ReportScreen> {
           pw.SizedBox(height: 20),
           _buildPatientInfoSummary(),
           pw.SizedBox(height: 30),
-          
           pw.Text('Clinical Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
           pw.Divider(color: PdfColors.grey300),
           pw.SizedBox(height: 10),
-          
-          // Estágio de métricas 
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -53,13 +50,10 @@ class _ReportScreenState extends State<ReportScreen> {
               _buildMetricBox('Est. HbA1c', '6.2 %', color: PdfColors.green700),
             ]
           ),
-          
           pw.SizedBox(height: 30),
           pw.Text('Detailed Logbook', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
           pw.Divider(color: PdfColors.grey300),
           pw.SizedBox(height: 10),
-          
-          // Tabela de Dados
           _buildDataTable(),
         ],
         footer: (context) => pw.Column(
@@ -80,7 +74,6 @@ class _ReportScreenState extends State<ReportScreen> {
     return pdf.save();
   }
 
-  // --- COMPONENTES DO PDF ---
   pw.Widget _buildPdfHeader() {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -150,10 +143,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   pw.Widget _buildDataTable() {
-    // Cabeçalhos
     final headers = ['Time', 'Type', 'Title', 'Carbs (g)', 'Insulin (U)'];
-    
-    // Dados mapeados do globalDiary
     final data = globalDiary.map((entry) {
       return [
         entry['time'].toString(),
@@ -182,6 +172,7 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  // --- NOVA INTERFACE GRÁFICA (Lista Visual + Swipe to Delete) ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -193,20 +184,140 @@ class _ReportScreenState extends State<ReportScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Weekly PDF Report', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text('Diário', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
+        actions: [
+          // Botão que gera o PDF e abre a caixa nativa de partilha/impressão
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF2DD4BF)),
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('A gerar PDF...'), duration: Duration(seconds: 1)),
+              );
+              await Printing.layoutPdf(
+                onLayout: (PdfPageFormat format) async => await _generateMedicalReport(format),
+                name: 'SmartGlycoAI_Report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      // O PdfPreview cria automaticamente os botões de Partilha e Impressão
-      body: PdfPreview(
-        build: (format) => _generateMedicalReport(format),
-        allowPrinting: true,
-        allowSharing: true,
-        canChangeOrientation: false,
-        canChangePageFormat: false,
-        canDebug: false,
-        pdfFileName: 'SmartGlycoAI_Report_${DateTime.now().millisecondsSinceEpoch}.pdf',
-        scrollViewDecoration: const BoxDecoration(color: Color(0xFF090C10)),
-        previewPageMargin: const EdgeInsets.all(16),
+      body: globalDiary.isEmpty
+          ? const Center(
+              child: Text(
+                'Sem registos hoje.\nVai à Home para adicionar.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54, fontSize: 16),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: globalDiary.length,
+              itemBuilder: (context, index) {
+                // Invertemos a ordem para os registos mais recentes aparecerem no topo
+                final reversedIndex = globalDiary.length - 1 - index;
+                final entry = globalDiary[reversedIndex];
+
+                return Dismissible(
+                  // Usamos um UniqueKey para o Flutter não se perder ao apagar linhas
+                  key: UniqueKey(),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete_outline, color: Colors.white, size: 30),
+                  ),
+                  onDismissed: (direction) {
+                    final removedTitle = entry['title'];
+                    
+                    setState(() {
+                      globalDiary.removeAt(reversedIndex);
+                    });
+                    
+                    saveData(); // Grava a eliminação na base de dados
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$removedTitle apagado com sucesso.'),
+                        backgroundColor: Colors.redAccent,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: _buildLogCard(entry),
+                );
+              },
+            ),
+    );
+  }
+
+  // Desenha os cartões na lista baseados no tipo (Refeição, Medicação, etc)
+  Widget _buildLogCard(Map<String, dynamic> entry) {
+    final isMedication = entry['type'] == 'medication';
+    final isMeal = entry['carbs'] != null && entry['carbs'] > 0;
+    
+    IconData icon = Icons.water_drop;
+    Color iconColor = const Color(0xFFE81CFF); // Rosa para correções (Insulina pura)
+    
+    if (isMedication) {
+      icon = Icons.medication;
+      iconColor = const Color(0xFF8B5CF6); // Roxo para comprimidos/medicação
+    } else if (isMeal) {
+      icon = Icons.restaurant;
+      iconColor = const Color(0xFFD29C46); // Laranja para comida
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry['title']?.toString() ?? 'Registo', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time, color: Colors.white54, size: 14),
+                    const SizedBox(width: 4),
+                    Text(entry['time']?.toString() ?? '--:--', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (entry['insulin'] != null && entry['insulin'] > 0)
+                Text('${entry['insulin']} U', style: const TextStyle(color: Color(0xFFE45C96), fontSize: 15, fontWeight: FontWeight.bold)),
+              if (entry['carbs'] != null && entry['carbs'] > 0)
+                Text('${entry['carbs']} g', style: const TextStyle(color: Color(0xFFD29C46), fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          )
+        ],
       ),
     );
   }

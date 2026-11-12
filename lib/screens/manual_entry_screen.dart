@@ -34,6 +34,13 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   void initState() {
     super.initState();
     _entryType = widget.initialType; 
+    
+    // Sempre que o utilizador escreve os hidratos à mão, recalcula a insulina
+    cCtrl.addListener(() {
+      if (!_isLoadingBarcode && cCtrl.text.isNotEmpty) {
+        _recalculateInsulinWithTags();
+      }
+    });
   }
 
   @override
@@ -44,8 +51,29 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     super.dispose(); 
   }
 
+  void _recalculateInsulinWithTags() {
+    double carbs = double.tryParse(cCtrl.text) ?? 0.0;
+    if (carbs == 0) return;
+    
+    double baseInsulin = carbs / globalIcr;
+    
+    bool hasStressOrDoente = _selectedTags.contains('🤒 Doente') || _selectedTags.contains('😤 Stress');
+    bool hasAtivoOrTreino = _selectedTags.contains('🏋️ Pós-Treino') || _selectedTags.contains('🏃 Ativo');
+
+    if (hasStressOrDoente) {
+      baseInsulin *= 1.20; 
+    }
+    if (hasAtivoOrTreino) {
+      baseInsulin *= 0.80; 
+    }
+
+    iCtrl.text = baseInsulin.toStringAsFixed(1);
+  }
+
   Future<void> _scanBarcode() async {
     HapticFeedback.lightImpact();
+    MobileScannerController cameraController = MobileScannerController();
+
     try {
       String? barcodeScanRes = await Navigator.push<String>(
         context,
@@ -57,17 +85,33 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               backgroundColor: cardColor,
               iconTheme: const IconThemeData(color: Colors.white),
             ),
-            body: MobileScanner(
-              onDetect: (capture) {
-                final List<Barcode> barcodes = capture.barcodes;
-                if (barcodes.isNotEmpty) {
-                  final String? code = barcodes.first.rawValue;
-                  if (code != null) {
-                    HapticFeedback.mediumImpact();
-                    Navigator.pop(context, code);
-                  }
-                }
-              },
+            body: Stack(
+              children: [
+                MobileScanner(
+                  controller: cameraController,
+                  onDetect: (capture) {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty) {
+                      final String? code = barcodes.first.rawValue;
+                      if (code != null) {
+                        cameraController.stop(); 
+                        HapticFeedback.mediumImpact();
+                        Navigator.pop(context, code);
+                      }
+                    }
+                  },
+                ),
+                Center(
+                  child: Container(
+                    width: 250,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF2DD4BF), width: 3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -77,24 +121,26 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
         setState(() { _isLoadingBarcode = true; });
         final url = Uri.parse('https://world.openfoodfacts.org/api/v0/product/$barcodeScanRes.json');
         final response = await http.get(url);
+        
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == 1) { 
             final product = data['product'];
             setState(() { 
-              tCtrl.text = product['product_name'] ?? 'Unknown Product'; 
+              tCtrl.text = product['product_name'] ?? 'Produto Desconhecido'; 
               cCtrl.text = (double.tryParse((product['nutriments']?['carbohydrates_100g'] ?? 0).toString()) ?? 0.0).toStringAsFixed(1); 
-              iCtrl.text = ((double.tryParse(cCtrl.text) ?? 0) / globalIcr).toStringAsFixed(1); 
+              _recalculateInsulinWithTags(); 
             });
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Product fetched!'), backgroundColor: Color(0xFF2DD4BF)));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Produto adicionado!'), backgroundColor: Color(0xFF2DD4BF)));
           } else {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Product not found.'), backgroundColor: Colors.orangeAccent));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Produto não encontrado na base de dados.'), backgroundColor: Colors.orangeAccent));
           }
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.redAccent));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Erro de rede: $e'), backgroundColor: Colors.redAccent));
     } finally {
+      cameraController.dispose();
       if (mounted) setState(() { _isLoadingBarcode = false; });
     }
   }
@@ -162,7 +208,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             ),
             const SizedBox(height: 24),
             
-            // --- A NOVA BARRA DE PESQUISA / SCANNER DE CÓDIGO ---
             TextField(
               controller: tCtrl,
               style: const TextStyle(color: Colors.white),
@@ -215,6 +260,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                       } else {
                         _selectedTags.remove(tag);
                       }
+                      _recalculateInsulinWithTags();
                     });
                   },
                 );
@@ -225,15 +271,21 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             GestureDetector(
               onTap: () { 
                 HapticFeedback.mediumImpact(); 
+                
+                final now = DateTime.now();
+                // FIX: Hora sempre formatada com 2 dígitos (ex: 09:05) para o IOB não quebrar
+                final safeTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
                 globalDiary.insert(0, {
                   'title': tCtrl.text.isEmpty ? 'Manual Log' : tCtrl.text, 
                   'carbs': double.tryParse(cCtrl.text) ?? 0.0, 
                   'insulin': double.tryParse(iCtrl.text) ?? 0.0, 
-                  'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}', 
+                  'time': safeTime, 
                   'type': _entryType, 
                   'imagePath': null,
                   'tags': List<String>.from(_selectedTags) 
                 }); 
+                
                 saveData(); 
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Logged!'), backgroundColor: Color(0xFF2DD4BF))); 
                 Navigator.of(context).pop(); 

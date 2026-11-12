@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
+import '../app_data.dart'; 
 
 class MedicationScreen extends StatefulWidget {
   const MedicationScreen({super.key});
@@ -16,6 +18,45 @@ class _MedicationScreenState extends State<MedicationScreen> {
 
   String _selectedTab = 'Today';
 
+  // ATENÇÃO: Verifica se colou bem com os símbolos < e >
+  final List _medications = [
+    {
+      'name': 'Metformin',
+      'details': '500 mg • 1 tablet',
+      'time': '8:00 AM',
+      'icon': Icons.medication,
+      'isTaken': false,
+    },
+    {
+      'name': 'Insulin Glargine',
+      'details': '10 U • Injection',
+      'time': '9:00 PM',
+      'icon': Icons.vaccines,
+      'isTaken': false,
+    },
+    {
+      'name': 'Vitamin D',
+      'details': '1000 IU • 1 tablet',
+      'time': '8:00 AM',
+      'icon': Icons.medication,
+      'isTaken': false,
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // 1. SINCRONIZAR ESTADO: Sempre que abres o ecrã, verifica se já tomaste hoje
+    for (var i = 0; i < _medications.length; i++) {
+      final medTitleToFind = '💊 ' + _medications[i]['name'].toString();
+      
+      // Procura no diário global se já existe um registo com este nome
+      final hasBeenTaken = globalDiary.any((entry) => entry['title'] == medTitleToFind);
+      
+      _medications[i]['isTaken'] = hasBeenTaken;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,37 +70,13 @@ class _MedicationScreenState extends State<MedicationScreen> {
             _buildTimeSelector(),
             const SizedBox(height: 24),
             
-            // Lista de Medicamentos
-            _buildMedicationCard(
-              name: 'Metformin',
-              details: '500 mg • 1 tablet',
-              time: '8:00 AM',
-              icon: Icons.medication,
-              isTaken: true,
-            ),
-            _buildMedicationCard(
-              name: 'Insulin Glargine',
-              details: '10 U • Injection',
-              time: '9:00 PM',
-              icon: Icons.vaccines, // Seringa
-              isTaken: false,
-            ),
-            _buildMedicationCard(
-              name: 'Vitamin D',
-              details: '1000 IU • 1 tablet',
-              time: '8:00 AM',
-              icon: Icons.medication,
-              isTaken: true,
-            ),
+            ...List.generate(_medications.length, (index) {
+              return _buildMedicationCard(index);
+            }),
             
             const SizedBox(height: 8),
-            
-            // Banner "Next dose"
             _buildNextDoseBanner(),
-            
             const SizedBox(height: 16),
-            
-            // Grid de Estatísticas (Igual aos Trends)
             _buildStatsGrid(),
             const SizedBox(height: 40),
           ],
@@ -68,7 +85,6 @@ class _MedicationScreenState extends State<MedicationScreen> {
     );
   }
 
-  // --- CABEÇALHO ---
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -106,7 +122,6 @@ class _MedicationScreenState extends State<MedicationScreen> {
     );
   }
 
-  // --- SELETOR DE TEMPO (Today / Week / Month) ---
   Widget _buildTimeSelector() {
     final tabs = ['Today', 'Week', 'Month'];
     return Container(
@@ -153,75 +168,124 @@ class _MedicationScreenState extends State<MedicationScreen> {
     );
   }
 
-  // --- CARTÃO DE MEDICAMENTO ---
-  Widget _buildMedicationCard({required String name, required String details, required String time, required IconData icon, required bool isTaken}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          // Ícone circular com brilho interno
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [Colors.white.withOpacity(0.2), Colors.transparent],
-                radius: 0.8,
-              ),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+  Widget _buildMedicationCard(int index) {
+    final med = _medications[index];
+    final bool isTaken = med['isTaken'] == true;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact(); 
+        
+        bool willBeTaken = !isTaken; 
+        
+        setState(() {
+          _medications[index]['isTaken'] = willBeTaken; 
+        });
+
+        final medTitle = '💊 ' + med['name'].toString();
+
+        if (willBeTaken) {
+          // 2. ADICIONAR AO DIÁRIO
+          final now = DateTime.now();
+          final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+          
+          globalDiary.add({
+            'title': medTitle,
+            'carbs': 0.0,
+            'insulin': 0.0, 
+            'time': timeStr,
+            'type': 'medication',
+            'imagePath': null
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${med['name']} adicionado ao diário!'),
+              backgroundColor: const Color(0xFF00E676),
+              duration: const Duration(seconds: 2),
             ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 16),
-          // Detalhes da medicação
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 2),
-                Text(details, style: const TextStyle(color: Colors.white54, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(time, style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)), // Verde/Teal para a hora
-              ],
+          );
+        } else {
+          // 3. REMOVER DO DIÁRIO (Se o utilizador tirar o check)
+          globalDiary.removeWhere((entry) => entry['title'] == medTitle);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${med['name']} removido do diário!'),
+              backgroundColor: Colors.redAccent,
+              duration: const Duration(seconds: 2),
             ),
-          ),
-          // Estado (Taken ou Upcoming)
-          Column(
-            children: [
-              Icon(
-                isTaken ? Icons.check_circle : Icons.add_circle_outline,
-                color: isTaken ? const Color(0xFF00E676) : Colors.white54,
-                size: 24,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isTaken ? 'Taken' : 'Upcoming',
-                style: TextStyle(
-                  color: isTaken ? const Color(0xFF00E676) : Colors.white54,
-                  fontSize: 12,
+          );
+        }
+        
+        // 4. GRAVAR NA BASE DE DADOS DO TELEMÓVEL (SharedPreferences)
+        saveData(); 
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Colors.white.withOpacity(0.2), Colors.transparent],
+                  radius: 0.8,
                 ),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
-            ],
-          )
-        ],
+              child: Icon(med['icon'] as IconData?, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(med['name'].toString(), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text(med['details'].toString(), style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(med['time'].toString(), style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.bold)), 
+                ],
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isTaken ? Icons.check_circle : Icons.add_circle_outline,
+                  color: isTaken ? const Color(0xFF00E676) : Colors.white54,
+                  size: 28, 
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isTaken ? 'Taken' : 'Upcoming',
+                  style: TextStyle(
+                    color: isTaken ? const Color(0xFF00E676) : Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
 
-  // --- BANNER PRÓXIMA DOSE (GRADIENTE ROXO) ---
   Widget _buildNextDoseBanner() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF8B5CF6), Color(0xFF4C1D95)], // Roxo forte
+          colors: [Color(0xFF8B5CF6), Color(0xFF4C1D95)], 
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -255,7 +319,6 @@ class _MedicationScreenState extends State<MedicationScreen> {
     );
   }
 
-  // --- GRID DE ESTATÍSTICAS ---
   Widget _buildStatsGrid() {
     return Row(
       children: [
