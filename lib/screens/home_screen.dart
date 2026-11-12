@@ -10,7 +10,7 @@ class HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // AQUI ESTÁ A COR UNIFICADA PARA TODA A APP
+    // COR UNIFICADA PARA TODA A APP
     const bgColor = Color(0xFF090C10);
     
     return Scaffold(
@@ -45,17 +45,19 @@ class HomeTab extends StatelessWidget {
               const Text('Updated 12 min ago', style: TextStyle(color: Colors.white54, fontSize: 13)),
               const SizedBox(height: 24),
 
+              // --- GRÁFICO DUPLO: PASSADO (REAL) E FUTURO (PREVISÃO IA) ---
               SizedBox(
-                height: 100,
+                height: 120, // Altura aumentada ligeiramente para o novo design
                 child: LineChart(
                   LineChartData(
                     minY: 50, maxY: 200,
+                    minX: 0, maxX: 10, // Eixo X expandido para o futuro
                     gridData: FlGridData(
                       show: true, 
                       drawVerticalLine: false,
                       getDrawingHorizontalLine: (value) {
                         if (value == 70 || value == 180) {
-                          return FlLine(color: Colors.white24, strokeWidth: 1, dashArray: [4, 4]);
+                          return FlLine(color: Colors.white.withOpacity(0.15), strokeWidth: 1, dashArray: [4, 4]);
                         }
                         return const FlLine(color: Colors.transparent);
                       },
@@ -67,10 +69,10 @@ class HomeTab extends StatelessWidget {
                       rightTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          reservedSize: 30,
+                          reservedSize: 32,
                           getTitlesWidget: (value, meta) {
                             if (value == 70 || value == 180) {
-                              return Text(value.toInt().toString(), style: const TextStyle(color: Colors.white54, fontSize: 10));
+                              return Text(value.toInt().toString(), style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold));
                             }
                             return const Text('');
                           },
@@ -79,32 +81,80 @@ class HomeTab extends StatelessWidget {
                     ),
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
+                      // 1. LINHA DO PASSADO (Glicose Real - Sólida e Verde/Teal)
                       LineChartBarData(
-                        spots: const [FlSpot(0, 110), FlSpot(1, 115), FlSpot(2, 130), FlSpot(3, 145), FlSpot(4, 135), FlSpot(5, 115), FlSpot(6, 112)],
+                        spots: const [
+                          FlSpot(0, 110), FlSpot(1, 115), FlSpot(2, 130), 
+                          FlSpot(3, 145), FlSpot(4, 135), FlSpot(5, 115), 
+                          FlSpot(6, 112) // Ponto Atual
+                        ],
                         isCurved: true,
                         curveSmoothness: 0.4,
-                        color: Colors.tealAccent.withOpacity(0.8),
+                        color: const Color(0xFF2DD4BF),
                         barWidth: 3,
                         isStrokeCapRound: true,
                         dotData: FlDotData(
                           show: true,
-                          checkToShowDot: (spot, barData) => spot.x == 6, 
-                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 6, color: Colors.tealAccent, strokeWidth: 3, strokeColor: bgColor),
+                          checkToShowDot: (spot, barData) => spot.x == 6, // Ponto apenas no "Agora"
+                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 6, color: const Color(0xFF2DD4BF), strokeWidth: 3, strokeColor: bgColor),
                         ),
                         belowBarData: BarAreaData(
                           show: true,
                           gradient: LinearGradient(
                             begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                            colors: [Colors.tealAccent.withOpacity(0.2), Colors.transparent],
+                            colors: [const Color(0xFF2DD4BF).withOpacity(0.2), Colors.transparent],
                           ),
                         ),
+                      ),
+                      
+                      // 2. LINHA DO FUTURO (Predição da IA - Tracejada e Roxa)
+                      LineChartBarData(
+                        spots: const [
+                          FlSpot(6, 112), // Começa exatamente onde a real acaba
+                          FlSpot(7, 100), 
+                          FlSpot(8, 85), 
+                          FlSpot(9, 72), 
+                          FlSpot(10, 65)  // Projeção de hipoglicemia
+                        ],
+                        isCurved: true,
+                        curveSmoothness: 0.4,
+                        color: const Color(0xFFE81CFF),
+                        barWidth: 3,
+                        isStrokeCapRound: true,
+                        dashArray: [8, 6], // Efeito Tracejado
+                        dotData: FlDotData(
+                          show: true,
+                          checkToShowDot: (spot, barData) => spot.x == 10, // Destaca o ponto final da previsão
+                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 4, color: Colors.transparent, strokeWidth: 2, strokeColor: const Color(0xFFE81CFF)),
+                        ),
+                        belowBarData: BarAreaData(show: false),
                       ),
                     ],
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              
+              // --- ALERTA DINÂMICO PREDITIVO ---
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE81CFF).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE81CFF).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.auto_awesome, color: Color(0xFFE81CFF), size: 16),
+                    SizedBox(width: 8),
+                    Text('AI Forecast: Drop to 65 mg/dL in 45m', style: TextStyle(color: Color(0xFFE81CFF), fontSize: 13, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
               const SizedBox(height: 30),
 
+              // --- CARTÕES DE NAVEGAÇÃO RÁPIDA ---
               GridView.count(
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
@@ -157,6 +207,7 @@ class HomeTab extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              // --- PRÓXIMA MEDICAÇÃO ---
               GestureDetector(
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const MedicationScreen()));
