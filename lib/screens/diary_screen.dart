@@ -6,7 +6,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
-import '../constants.dart';
 import '../app_data.dart';
 
 class DiaryTab extends StatefulWidget {

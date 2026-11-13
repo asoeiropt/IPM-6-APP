@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../constants.dart';
 import '../app_data.dart';
 
 class ManualEntryScreen extends StatefulWidget {

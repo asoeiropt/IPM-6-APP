@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
-import '../constants.dart';
 import '../app_data.dart';
 
 // --- CORES BASE DO NOVO DESIGN ---
