@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../app_data.dart'; // <-- Acesso ao isHighContrast
 
 class TrendsScreen extends StatefulWidget {
   const TrendsScreen({super.key});
@@ -9,18 +10,19 @@ class TrendsScreen extends StatefulWidget {
 }
 
 class _TrendsScreenState extends State<TrendsScreen> {
-  final Color bgColor = const Color(0xFF090C10);
-  final Color cardColor = const Color(0xFF141923);
-  final Gradient neonGradient = const LinearGradient(
-    colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)], 
-  );
-
   // Variáveis de estado para controlar os filtros selecionados
   String _selectedMainTime = '7d';
   String _selectedTrendTime = '7d';
 
+  // --- VARIÁVEIS PARA PINCH-TO-ZOOM (Manipulação Direta) ---
+  double minX = 0;
+  double maxX = 6;
+
   @override
   Widget build(BuildContext context) {
+    // --- LÓGICA DE ALTO CONTRASTE ---
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
@@ -45,6 +47,11 @@ class _TrendsScreenState extends State<TrendsScreen> {
 
   // --- CABEÇALHO ---
   Widget _buildHeader() {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final subTextColor = isHighContrast ? Colors.white : const Color(0xFF64748B);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -55,16 +62,16 @@ class _TrendsScreenState extends State<TrendsScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                  child: Icon(Icons.arrow_back_ios_new, color: mainTextColor, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Text('Trends', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                Text('Trends', style: TextStyle(color: mainTextColor, fontSize: 26, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.only(left: 32),
-              child: Text('Your glucose patterns', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: Text('Your glucose patterns', style: TextStyle(color: subTextColor, fontSize: 14)),
             ),
           ],
         ),
@@ -73,16 +80,16 @@ class _TrendsScreenState extends State<TrendsScreen> {
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
           ),
           child: Row(
             children: [
-              const Icon(Icons.search, color: Colors.white54, size: 20),
+              Icon(Icons.search, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white54, size: 20),
               const SizedBox(width: 12),
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 14,
-                backgroundColor: Color(0xFF387A76),
-                child: Icon(Icons.person, color: Colors.white, size: 16),
+                backgroundColor: isHighContrast ? Colors.transparent : const Color(0xFF387A76),
+                child: Icon(Icons.person, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, size: 16),
               ),
             ],
           ),
@@ -94,16 +101,37 @@ class _TrendsScreenState extends State<TrendsScreen> {
   // --- SELETOR DE TEMPO PRINCIPAL (TOP) ---
   Widget _buildMainTimeSelector() {
     final times = ['3h', '6h', '12h', '24h', '7d'];
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.transparent;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 0),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: times.map((t) {
           final isSelected = _selectedMainTime == t;
+          final neonGradient = const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)]);
+
+          BoxDecoration? decoration;
+          if (isSelected) {
+            decoration = isHighContrast
+                ? BoxDecoration(color: const Color(0xFFFFD600), borderRadius: BorderRadius.circular(24))
+                : BoxDecoration(
+                    gradient: neonGradient, 
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))]
+                  );
+          }
+
+          final textColor = isSelected 
+              ? (isHighContrast ? Colors.black : Colors.white) 
+              : (isHighContrast ? Colors.white : Colors.white54);
+
           return GestureDetector(
             onTap: () {
               setState(() {
@@ -113,17 +141,11 @@ class _TrendsScreenState extends State<TrendsScreen> {
             behavior: HitTestBehavior.opaque,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: isSelected ? neonGradient : null,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: isSelected
-                    ? [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))]
-                    : [],
-              ),
+              decoration: decoration,
               child: Text(
                 t,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white54,
+                  color: textColor,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -136,22 +158,28 @@ class _TrendsScreenState extends State<TrendsScreen> {
 
   // --- GRÁFICO DE LINHA (GLUCOSE TREND) ---
   Widget _buildLineChartCard() {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final gridColor = isHighContrast ? Colors.white.withOpacity(0.3) : Colors.white.withOpacity(0.05);
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Glucose Trend', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('Glucose Trend', style: TextStyle(color: mainTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
               Container(
                 padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: isHighContrast ? const Color(0xFFFFD600) : Colors.transparent)),
                 child: Row(
                   children: [
                     _miniPill('24h'),
@@ -168,23 +196,32 @@ class _TrendsScreenState extends State<TrendsScreen> {
             child: LineChart(
               LineChartData(
                 minY: 60, maxY: 190,
-                minX: 0, maxX: 6,
+                
+                // --- HEURÍSTICA DE MANIPULAÇÃO DIRETA (PINCH-TO-ZOOM E ARRASTO) ---
+                minX: minX, maxX: maxX,
+                clipData: const FlClipData.all(), // Não deixa o gráfico sair da caixa ao fazer zoom
+                lineTouchData: LineTouchData(
+                  touchSpotThreshold: 20,
+                  handleBuiltInTouches: true,
+                ),
+                // ----------------------------------------------------------------
+
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 10, // AQUI: Força a verificar de 10 em 10
-                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1),
+                  horizontalInterval: 10, 
+                  getDrawingHorizontalLine: (value) => FlLine(color: gridColor, strokeWidth: isHighContrast ? 2 : 1),
                   checkToShowHorizontalLine: (value) => [70.0, 100.0, 140.0, 180.0].contains(value),
                 ),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 36, // Mais espaço para o número 180 caber bem
-                      interval: 10, // AQUI: Garante que os números 70, 100, 140, 180 são avaliados
+                      reservedSize: 36, 
+                      interval: 10, 
                       getTitlesWidget: (value, meta) {
                         if (![70.0, 100.0, 140.0, 180.0].contains(value)) return const SizedBox();
-                        return Text(value.toInt().toString(), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600));
+                        return Text(value.toInt().toString(), style: TextStyle(color: isHighContrast ? Colors.white : Colors.white70, fontSize: 12, fontWeight: FontWeight.w600));
                       },
                     ),
                   ),
@@ -203,8 +240,9 @@ class _TrendsScreenState extends State<TrendsScreen> {
                     spots: _getSpotsForLineChart(),
                     isCurved: true,
                     curveSmoothness: 0.35,
-                    gradient: const LinearGradient(colors: [Color(0xFFE81CFF), Color(0xFF40C9FF)]),
-                    barWidth: 3,
+                    color: isHighContrast ? const Color(0xFFFFD600) : null,
+                    gradient: isHighContrast ? null : const LinearGradient(colors: [Color(0xFFE81CFF), Color(0xFF40C9FF)]),
+                    barWidth: isHighContrast ? 4 : 3,
                     isStrokeCapRound: true,
                     dotData: FlDotData(
                       show: true,
@@ -212,15 +250,15 @@ class _TrendsScreenState extends State<TrendsScreen> {
                         final isLast = index == _getSpotsForLineChart().length - 1;
                         return FlDotCirclePainter(
                           radius: isLast ? 5 : 4,
-                          color: Colors.white,
-                          strokeWidth: isLast ? 4 : 0,
-                          strokeColor: const Color(0xFF3B82F6).withOpacity(0.5),
+                          color: isHighContrast ? Colors.black : Colors.white,
+                          strokeWidth: isLast ? (isHighContrast ? 2 : 4) : (isHighContrast ? 2 : 0),
+                          strokeColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6).withOpacity(0.5),
                         );
                       },
                     ),
                     belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
+                      show: !isHighContrast, // Desliga o fundo suave em alto contraste
+                      gradient: isHighContrast ? null : LinearGradient(
                         colors: [const Color(0xFFE81CFF).withOpacity(0.2), Colors.transparent],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -231,6 +269,16 @@ class _TrendsScreenState extends State<TrendsScreen> {
               ),
             ),
           ),
+          // INSTRUÇÃO VISUAL PARA O UTILIZADOR
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.pinch, color: isHighContrast ? Colors.white : Colors.white54, size: 14),
+              const SizedBox(width: 6),
+              Text('Pinch to zoom / Drag to pan', style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 10, fontStyle: FontStyle.italic)),
+            ],
+          )
         ],
       ),
     );
@@ -264,28 +312,34 @@ class _TrendsScreenState extends State<TrendsScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
-      child: Text(text, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      child: Text(text, style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 11)),
     );
   }
 
   Widget _miniPill(String text) {
     final isSelected = _selectedTrendTime == text;
+    final neonGradient = const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)]);
+
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedTrendTime = text;
+          // Faz reset ao zoom quando mudamos o filtro
+          minX = 0;
+          maxX = 6;
         });
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          gradient: isSelected ? neonGradient : null,
+          color: isSelected && isHighContrast ? const Color(0xFFFFD600) : Colors.transparent,
+          gradient: isSelected && !isHighContrast ? neonGradient : null,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           text, 
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white54, 
+            color: isSelected ? (isHighContrast ? Colors.black : Colors.white) : (isHighContrast ? Colors.white : Colors.white54), 
             fontSize: 12, 
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
           )
@@ -300,29 +354,34 @@ class _TrendsScreenState extends State<TrendsScreen> {
       children: [
         Expanded(child: _statCard('Avg Glucose', '124', 'mg/dL')),
         const SizedBox(width: 12),
-        Expanded(child: _statCard('Time in Range', '78', '%', valueColor: const Color(0xFF2DD4BF))),
+        Expanded(child: _statCard('Time in Range', '78', '%', valueColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF))),
         const SizedBox(width: 12),
         Expanded(child: _statCard('Est. HbA1c', '6.8', '%')),
       ],
     );
   }
 
-  Widget _statCard(String title, String value, String unit, {Color valueColor = Colors.white}) {
+  Widget _statCard(String title, String value, String unit, {Color? valueColor}) {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final finalValueColor = valueColor ?? mainTextColor;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          Text(title, style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 12)),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(value, style: TextStyle(color: valueColor, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text(value, style: TextStyle(color: finalValueColor, fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(width: 2),
-              Text(unit, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+              Text(unit, style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 10)),
             ],
           ),
         ],
@@ -333,40 +392,51 @@ class _TrendsScreenState extends State<TrendsScreen> {
   // --- GRÁFICO DE BARRAS (DAILY PATTERN) ---
   Widget _buildBarChartCard() {
     final barHeights = _getHeightsForBarChart();
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final gridColor = isHighContrast ? Colors.white.withOpacity(0.3) : Colors.white.withOpacity(0.05);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Daily Pattern', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          Text('Daily Pattern', style: TextStyle(color: mainTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           SizedBox(
             height: 120,
             child: BarChart(
               BarChartData(
                 maxY: 190,
+                
+                // Heurística Manipulação Direta no BarChart
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  handleBuiltInTouches: true,
+                ),
+
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 10, // AQUI: Força a verificar de 10 em 10
-                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1),
+                  horizontalInterval: 10, 
+                  getDrawingHorizontalLine: (value) => FlLine(color: gridColor, strokeWidth: isHighContrast ? 2 : 1),
                   checkToShowHorizontalLine: (value) => [70.0, 100.0, 140.0, 180.0].contains(value),
                 ),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 36, // Mais espaço
-                      interval: 10, // AQUI: Garante que os números 70, 100, 140, 180 são avaliados
+                      reservedSize: 36, 
+                      interval: 10, 
                       getTitlesWidget: (value, meta) {
                         if (![70.0, 100.0, 140.0, 180.0].contains(value)) return const SizedBox();
-                        return Text(value.toInt().toString(), style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600));
+                        return Text(value.toInt().toString(), style: TextStyle(color: isHighContrast ? Colors.white : Colors.white70, fontSize: 10, fontWeight: FontWeight.w600));
                       },
                     ),
                   ),
@@ -378,7 +448,7 @@ class _TrendsScreenState extends State<TrendsScreen> {
                         if (value.toInt() % 6 == 0 && value.toInt() ~/ 6 < labels.length) {
                           return Padding(
                             padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(labels[value.toInt() ~/ 6], style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                            child: Text(labels[value.toInt() ~/ 6], style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 10)),
                           );
                         }
                         return const SizedBox();
@@ -396,7 +466,8 @@ class _TrendsScreenState extends State<TrendsScreen> {
                       BarChartRodData(
                         toY: barHeights[index].toDouble(),
                         width: 6,
-                        gradient: const LinearGradient(
+                        color: isHighContrast ? const Color(0xFFFFD600) : null,
+                        gradient: isHighContrast ? null : const LinearGradient(
                           colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,

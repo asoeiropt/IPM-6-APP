@@ -1,23 +1,31 @@
 import 'package:flutter/material.dart';
+import '../app_data.dart'; // <-- Acesso ao isHighContrast
 
-class PrivacyPolicyScreen extends StatelessWidget {
+class PrivacyPolicyScreen extends StatefulWidget {
   const PrivacyPolicyScreen({super.key});
 
-  final Color bgColor = const Color(0xFF090C10);
-  final Color cardColor = const Color(0xFF141923);
+  @override
+  State<PrivacyPolicyScreen> createState() => _PrivacyPolicyScreenState();
+}
 
+class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   @override
   Widget build(BuildContext context) {
+    // --- LÓGICA DE ALTO CONTRASTE ---
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final subTextColor = isHighContrast ? Colors.white : Colors.white54;
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: mainTextColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Privacy Policy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Privacy Policy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: mainTextColor)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -26,7 +34,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Last updated: November 2026', style: TextStyle(color: Colors.white54, fontSize: 13)),
+              Text('Last updated: November 2026', style: TextStyle(color: subTextColor, fontSize: 13)),
               const SizedBox(height: 24),
               
               _buildSection(
@@ -64,25 +72,31 @@ class PrivacyPolicyScreen extends StatelessWidget {
   }
 
   Widget _buildSection({required IconData icon, required String title, required String content}) {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final iconColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6);
+    final titleColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final contentColor = isHighContrast ? Colors.white : Colors.white70;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF3B82F6), size: 24),
+              Icon(icon, color: iconColor, size: 24),
               const SizedBox(width: 12),
-              Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+              Expanded(child: Text(title, style: TextStyle(color: titleColor, fontSize: 16, fontWeight: FontWeight.bold))),
             ],
           ),
           const SizedBox(height: 12),
-          Text(content, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
+          Text(content, style: TextStyle(color: contentColor, fontSize: 14, height: 1.5)),
         ],
       ),
     );

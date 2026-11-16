@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/services.dart'; // Importado para Haptic Feedback
 import 'trends_screen.dart'; 
 import 'medication_screen.dart'; 
 import 'activity_screen.dart'; 
 import 'report_screen.dart';
-import '../app_data.dart'; 
+import '../app_data.dart'; // <-- Acesso ao triggerHypoAlert e isHighContrast
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -16,7 +17,6 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   String _currentIOB = "0.0";
   
-  // Variáveis Dinâmicas do Gráfico e Dashboard
   double _currentGlucose = 0;
   double _trendValue = 0;
   final List<FlSpot> _realSpots = [];
@@ -31,7 +31,6 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _refreshData() {
-    // Se a lista estiver vazia (porque a cache guardou []), injetamos os dados de teste para veres o gráfico!
     if (globalGlucose.isEmpty) {
       final now = DateTime.now();
       globalGlucose = [
@@ -45,7 +44,6 @@ class _HomeTabState extends State<HomeTab> {
       ];
     }
 
-    // 1. GERAR OS PONTOS REAIS
     _realSpots.clear();
     for (int i = 0; i < globalGlucose.length; i++) {
       _realSpots.add(FlSpot(i.toDouble(), (globalGlucose[i]['value'] as num).toDouble()));
@@ -57,12 +55,10 @@ class _HomeTabState extends State<HomeTab> {
       _trendValue = _currentGlucose - _realSpots.first.y; 
     }
 
-    // 2. MOTOR DE PREVISÃO (AI FORECAST BASEADO NO IOB E ISF)
     double currentIob = calculateIOB();
     double expectedDrop = currentIob * globalIsf; 
     double forecastTarget = _currentGlucose - expectedDrop;
     
-    // Travar num valor mínimo seguro para o gráfico não ir aos negativos
     if (forecastTarget < 40) forecastTarget = 40; 
 
     _forecastSpots.clear();
@@ -91,10 +87,19 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFF090C10);
+    // --- LÓGICA DE ALTO CONTRASTE ---
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final subTextColor = isHighContrast ? Colors.white : Colors.white70;
     
+    final chartRealColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF);
+    final chartForecastColor = isHighContrast ? Colors.white : const Color(0xFFE81CFF);
+    final gridLineColor = isHighContrast ? Colors.white.withOpacity(0.5) : Colors.white.withOpacity(0.15);
+
     bool isTrendDown = _trendValue <= 0;
-    Color trendColor = isTrendDown ? Colors.tealAccent : Colors.orangeAccent;
+    Color trendColor = isHighContrast 
+        ? (isTrendDown ? Colors.white : const Color(0xFFFFD600)) 
+        : (isTrendDown ? Colors.tealAccent : Colors.orangeAccent);
     IconData trendIcon = isTrendDown ? Icons.arrow_downward : Icons.arrow_upward;
     String trendPrefix = _trendValue > 0 ? '+' : '';
     
@@ -107,11 +112,21 @@ class _HomeTabState extends State<HomeTab> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 20), 
-              const Text('Glucose', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500)),
+              Text('Glucose', style: TextStyle(color: mainTextColor, fontSize: 18, fontWeight: FontWeight.w500)),
               const SizedBox(height: 4),
-              // VALOR REAL
-              Text('${_currentGlucose.toInt()}', style: const TextStyle(color: Colors.white, fontSize: 80, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: 2)),
-              const Text('mg/dL', style: TextStyle(color: Colors.white70, fontSize: 16)),
+              
+              // --- TRUQUE DE APRESENTAÇÃO (ACIONAL NOTIFICAÇÃO) ---
+              GestureDetector(
+                onLongPress: () {
+                  HapticFeedback.heavyImpact(); // Vibração longa para tu saberes que ativaste
+                  triggerHypoAlert();
+                  debugPrint("Notificação Preditiva Disparada!");
+                },
+                child: Text('${_currentGlucose.toInt()}', style: TextStyle(color: mainTextColor, fontSize: 80, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: 2)),
+              ),
+              // ----------------------------------------------------
+
+              Text('mg/dL', style: TextStyle(color: subTextColor, fontSize: 16)),
               const SizedBox(height: 16),
               
               Row(
@@ -119,16 +134,20 @@ class _HomeTabState extends State<HomeTab> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: trendColor.withOpacity(0.2), shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: isHighContrast ? Colors.transparent : trendColor.withOpacity(0.2), 
+                      shape: BoxShape.circle,
+                      border: isHighContrast ? Border.all(color: trendColor) : null
+                    ),
                     child: Icon(trendIcon, color: trendColor, size: 14),
                   ),
                   const SizedBox(width: 8),
                   Text('$trendPrefix${_trendValue.toInt()} mg/dL ', style: TextStyle(color: trendColor, fontSize: 14, fontWeight: FontWeight.bold)),
-                  const Text('vs. last hour', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  Text('vs. last hour', style: TextStyle(color: subTextColor, fontSize: 14)),
                 ],
               ),
               const SizedBox(height: 12),
-              const Text('Updated just now', style: TextStyle(color: Colors.white54, fontSize: 13)),
+              Text('Updated just now', style: TextStyle(color: subTextColor, fontSize: 13)),
               const SizedBox(height: 24),
 
               SizedBox(
@@ -142,7 +161,7 @@ class _HomeTabState extends State<HomeTab> {
                       drawVerticalLine: false,
                       getDrawingHorizontalLine: (value) {
                         if (value == 70 || value == 180) {
-                          return FlLine(color: Colors.white.withOpacity(0.15), strokeWidth: 1, dashArray: [4, 4]);
+                          return FlLine(color: gridLineColor, strokeWidth: isHighContrast ? 2 : 1, dashArray: [4, 4]);
                         }
                         return const FlLine(color: Colors.transparent);
                       },
@@ -157,7 +176,7 @@ class _HomeTabState extends State<HomeTab> {
                           reservedSize: 32,
                           getTitlesWidget: (value, meta) {
                             if (value == 70 || value == 180) {
-                              return Text(value.toInt().toString(), style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold));
+                              return Text(value.toInt().toString(), style: TextStyle(color: mainTextColor, fontSize: 10, fontWeight: FontWeight.bold));
                             }
                             return const Text('');
                           },
@@ -170,19 +189,19 @@ class _HomeTabState extends State<HomeTab> {
                         spots: _realSpots,
                         isCurved: true,
                         curveSmoothness: 0.4,
-                        color: const Color(0xFF2DD4BF),
-                        barWidth: 3,
+                        color: chartRealColor,
+                        barWidth: isHighContrast ? 4 : 3,
                         isStrokeCapRound: true,
                         dotData: FlDotData(
                           show: true,
                           checkToShowDot: (spot, barData) => spot.x == _realSpots.last.x, 
-                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 6, color: const Color(0xFF2DD4BF), strokeWidth: 3, strokeColor: bgColor),
+                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 6, color: chartRealColor, strokeWidth: 3, strokeColor: bgColor),
                         ),
                         belowBarData: BarAreaData(
-                          show: true,
+                          show: !isHighContrast,
                           gradient: LinearGradient(
                             begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                            colors: [const Color(0xFF2DD4BF).withOpacity(0.2), Colors.transparent],
+                            colors: [chartRealColor.withOpacity(0.2), Colors.transparent],
                           ),
                         ),
                       ),
@@ -190,14 +209,14 @@ class _HomeTabState extends State<HomeTab> {
                         spots: _forecastSpots,
                         isCurved: true,
                         curveSmoothness: 0.4,
-                        color: const Color(0xFFE81CFF),
-                        barWidth: 3,
+                        color: chartForecastColor,
+                        barWidth: isHighContrast ? 4 : 3,
                         isStrokeCapRound: true,
                         dashArray: [8, 6], 
                         dotData: FlDotData(
                           show: true,
                           checkToShowDot: (spot, barData) => spot.x == _forecastSpots.last.x, 
-                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 4, color: Colors.transparent, strokeWidth: 2, strokeColor: const Color(0xFFE81CFF)),
+                          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(radius: 4, color: isHighContrast ? bgColor : Colors.transparent, strokeWidth: 2, strokeColor: chartForecastColor),
                         ),
                         belowBarData: BarAreaData(show: false),
                       ),
@@ -210,16 +229,16 @@ class _HomeTabState extends State<HomeTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE81CFF).withOpacity(0.1),
+                  color: isHighContrast ? Colors.black : chartForecastColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE81CFF).withOpacity(0.3)),
+                  border: Border.all(color: isHighContrast ? Colors.white : chartForecastColor.withOpacity(0.3), width: isHighContrast ? 2 : 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.auto_awesome, color: Color(0xFFE81CFF), size: 16),
+                    Icon(Icons.auto_awesome, color: chartForecastColor, size: 16),
                     const SizedBox(width: 8),
-                    Text(_aiForecastText, style: const TextStyle(color: Color(0xFFE81CFF), fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(_aiForecastText, style: TextStyle(color: chartForecastColor, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -250,14 +269,6 @@ class _HomeTabState extends State<HomeTab> {
                     icon: Icons.water_drop_outlined,
                     gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFE45C96), Color(0xFFB52B65)]),
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('A atualizar IOB... (Atual: $_currentIOB U)'),
-                          backgroundColor: const Color(0xFFE45C96),
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                      
                       Navigator.push(
                         context, 
                         MaterialPageRoute(builder: (context) => const MedicationScreen())
@@ -298,33 +309,43 @@ class _HomeTabState extends State<HomeTab> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF5A449A), Color(0xFF3D277A)]),
+                    color: isHighContrast ? Colors.black : null,
+                    gradient: isHighContrast ? null : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF5A449A), Color(0xFF3D277A)]),
                     borderRadius: BorderRadius.circular(24),
+                    border: isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 2) : null,
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
-                        child: const Icon(Icons.medication_outlined, color: Colors.white, size: 24),
+                        decoration: BoxDecoration(
+                          color: isHighContrast ? Colors.transparent : Colors.white.withOpacity(0.1), 
+                          shape: BoxShape.circle,
+                          border: isHighContrast ? Border.all(color: const Color(0xFFFFD600)) : null,
+                        ),
+                        child: Icon(Icons.medication_outlined, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, size: 24),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Next medication', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 4),
-                            Text('Metformin 500mg', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                            SizedBox(height: 2),
-                            Text('Today • 8:00 AM', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                            Text('Next medication', style: TextStyle(color: mainTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text('Metformin 500mg', style: TextStyle(color: subTextColor, fontSize: 14)),
+                            const SizedBox(height: 2),
+                            Text('Today • 8:00 AM', style: TextStyle(color: subTextColor, fontSize: 12)),
                           ],
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), shape: BoxShape.circle),
-                        child: const Icon(Icons.chevron_right, color: Colors.white, size: 20),
+                        decoration: BoxDecoration(
+                          color: isHighContrast ? Colors.transparent : Colors.black.withOpacity(0.3), 
+                          shape: BoxShape.circle,
+                          border: isHighContrast ? Border.all(color: Colors.white) : null,
+                        ),
+                        child: Icon(Icons.chevron_right, color: isHighContrast ? Colors.white : Colors.white, size: 20),
                       )
                     ],
                   ),
@@ -344,8 +365,10 @@ class _HomeTabState extends State<HomeTab> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: gradient,
+          color: isHighContrast ? Colors.black : null,
+          gradient: isHighContrast ? null : gradient,
           borderRadius: BorderRadius.circular(20),
+          border: isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 2) : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,18 +377,18 @@ class _HomeTabState extends State<HomeTab> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon, color: Colors.white, size: 20),
-                const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                Icon(icon, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, size: 20),
+                Icon(Icons.chevron_right, color: isHighContrast ? Colors.white : Colors.white54, size: 18),
               ],
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                Text(title, style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
                 Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                Text(subtitle, style: TextStyle(color: isHighContrast ? Colors.white : Colors.white70, fontSize: 12)),
               ],
             )
           ],

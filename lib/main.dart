@@ -18,7 +18,7 @@ void callbackDispatcher() {
         
         FlutterLocalNotificationsPlugin flip = FlutterLocalNotificationsPlugin();
         
-        var android = const AndroidInitializationSettings('@mipmap/launcher_icon');
+        var android = const AndroidInitializationSettings('@mipmap/ic_launcher'); // Corrigido para o ícone padrão do Flutter (ou usa o teu se tiveres um custom)
         var settings = InitializationSettings(android: android);
         
         await flip.initialize(settings);
@@ -30,10 +30,17 @@ void callbackDispatcher() {
           priority: Priority.high,
           color: Color(0xFFF43F5E),
           enableVibration: true,
+          // --- AÇÃO CONTEXTUAL (IPM: Eficiência e Flexibilidade) ---
+          actions: <AndroidNotificationAction>[
+            AndroidNotificationAction(
+              'action_juice', 
+              '🧃 Registar 15g Sumo', 
+              showsUserInterface: true, // Abre a app ou executa a ação visualmente
+            ),
+          ],
         );
         var platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
 
-        // Os 4 argumentos passados DIRETAMENTE, sem qualquer texto/nome antes
         await flip.show(
           0,
           '🚨 Alerta Preditivo (CGM)',
@@ -42,7 +49,7 @@ void callbackDispatcher() {
         );
       }
     }
-    return Future.value(true); // Indica ao Android que a task teve sucesso
+    return Future.value(true); 
   });
 }
 
@@ -51,7 +58,7 @@ Future<void> main() async {
 
   await Workmanager().initialize(
     callbackDispatcher,
-    isInDebugMode: true, // Mantém-se true para disparar logo a notificação de teste
+    isInDebugMode: true, 
   );
 
   await Workmanager().registerPeriodicTask(

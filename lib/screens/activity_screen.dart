@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:health/health.dart';
 import 'package:flutter/services.dart';
+import '../app_data.dart'; // <-- IMPORTADO para ler isHighContrast
 
 class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
@@ -11,15 +12,8 @@ class ActivityScreen extends StatefulWidget {
 }
 
 class _ActivityScreenState extends State<ActivityScreen> {
-  final Color bgColor = const Color(0xFF090C10);
-  final Color cardColor = const Color(0xFF141923);
-  final Gradient neonGradient = const LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
-  );
-
   String _selectedTab = 'Activity';
 
-  // --- VARIÁVEIS PARA OS DADOS REAIS ---
   int _stepsToday = 0;
   int _sleepHours = 0;
   int _sleepMinutes = 0;
@@ -28,56 +22,45 @@ class _ActivityScreenState extends State<ActivityScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchRealHealthData(); // Arranca a busca de dados ao abrir a página
+    _fetchRealHealthData();
   }
 
-  // --- LÓGICA DE INTEGRAÇÃO APPLE HEALTH / GOOGLE FIT ---
   Future<void> _fetchRealHealthData() async {
-    // Configura a API de saúde (usa o Health Connect na Google, se disponível)
     Health health = Health();
-    
-    // Define os tipos de dados que queremos ler
     var types = [
       HealthDataType.STEPS,
       HealthDataType.SLEEP_ASLEEP,
     ];
 
     try {
-      // 1. Pede permissão ao utilizador (Aparece o popup do iOS/Android)
       bool requested = await health.requestAuthorization(types);
-      
       if (requested) {
         var now = DateTime.now();
         var midnight = DateTime(now.year, now.month, now.day);
         var yesterday = now.subtract(const Duration(days: 1));
 
-        // 2. Vai buscar os PASSOS de hoje (desde a meia noite)
         int? steps = await health.getTotalStepsInInterval(midnight, now);
 
-        // 3. Vai buscar o SONO da última noite
         List<HealthDataPoint> sleepData = await health.getHealthDataFromTypes(
           startTime: yesterday,
           endTime: now,
           types: [HealthDataType.SLEEP_ASLEEP],
         );
 
-        // Soma os minutos de sono
         double totalSleepMinutes = 0;
         for (var point in sleepData) {
           totalSleepMinutes += (point.value as NumericHealthValue).numericValue.toDouble();
         }
 
-        // 4. Atualiza a UI
         if (mounted) {
           setState(() {
-            _stepsToday = steps ?? 0; // Se for null, mete 0
-            _sleepHours = totalSleepMinutes ~/ 60; // Divisão inteira para horas
-            _sleepMinutes = (totalSleepMinutes % 60).toInt(); // Resto para minutos
+            _stepsToday = steps ?? 0;
+            _sleepHours = totalSleepMinutes ~/ 60;
+            _sleepMinutes = (totalSleepMinutes % 60).toInt();
             _isLoadingData = false;
           });
         }
       } else {
-        // Sem permissão
         if (mounted) setState(() => _isLoadingData = false);
       }
     } catch (e) {
@@ -88,15 +71,20 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- LÓGICA DE ALTO CONTRASTE ---
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final subTextColor = isHighContrast ? Colors.white : const Color(0xFF64748B);
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: _isLoadingData 
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF3B82F6)))
+          ? Center(child: CircularProgressIndicator(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6)))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildHeader(),
+                _buildHeader(mainTextColor, subTextColor),
                 const SizedBox(height: 24),
                 _buildTabSelector(),
                 const SizedBox(height: 24),
@@ -111,7 +99,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(Color mainTextColor, Color subTextColor) {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final iconColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -122,16 +114,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                  child: Icon(Icons.arrow_back_ios_new, color: isHighContrast ? Colors.white : Colors.white, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Text('Activity & Sleep', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                Text('Activity & Sleep', style: TextStyle(color: mainTextColor, fontSize: 24, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.only(left: 32),
-              child: Text('Data synced from your phone.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: Text('Data synced from your phone.', style: TextStyle(color: subTextColor, fontSize: 13)),
             ),
           ],
         ),
@@ -140,18 +132,25 @@ class _ActivityScreenState extends State<ActivityScreen> {
           decoration: BoxDecoration(
             color: cardColor,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
           ),
-          child: const Icon(Icons.sync, color: Color(0xFF3B82F6), size: 20),
+          child: Icon(Icons.sync, color: iconColor, size: 20),
         ),
       ],
     );
   }
 
   Widget _buildTabSelector() {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.transparent;
+
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(30)),
+      decoration: BoxDecoration(
+        color: cardColor, 
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 0)
+      ),
       child: Row(
         children: [
           _buildTabButton('Activity'),
@@ -163,6 +162,20 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   Widget _buildTabButton(String title) {
     final isSelected = _selectedTab == title;
+    final neonGradient = const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)]);
+    
+    // Decoração do botão muda conforme o modo
+    BoxDecoration? decoration;
+    if (isSelected) {
+      decoration = isHighContrast 
+          ? BoxDecoration(color: const Color(0xFFFFD600), borderRadius: BorderRadius.circular(24))
+          : BoxDecoration(gradient: neonGradient, borderRadius: BorderRadius.circular(24));
+    }
+
+    final textColor = isSelected 
+        ? (isHighContrast ? Colors.black : Colors.white) 
+        : (isHighContrast ? Colors.white : Colors.white54);
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -172,15 +185,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
         behavior: HitTestBehavior.opaque,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            gradient: isSelected ? neonGradient : null,
-            borderRadius: BorderRadius.circular(24),
-          ),
+          decoration: decoration,
           child: Center(
             child: Text(
               title,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white54,
+                color: textColor,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 fontSize: 14,
               ),
@@ -210,11 +220,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildStepsCard() {
-    // Calcula a percentagem da rodinha (Meta: 10,000 passos)
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final primaryColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF);
+    final subTextColor = isHighContrast ? Colors.white : Colors.white54;
+    
     double stepProgress = _stepsToday / 10000;
     if (stepProgress > 1.0) stepProgress = 1.0; 
     
-    // Estima distância e calorias muito rapidamente com base nos passos reais
     double distanceKm = (_stepsToday * 0.762) / 1000; 
     int caloriesBurned = (_stepsToday * 0.04).toInt();
 
@@ -223,7 +236,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
       ),
       child: Column(
         children: [
@@ -235,21 +248,21 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withOpacity(0.2), 
+                      color: isHighContrast ? Colors.transparent : const Color(0xFF0D9488).withOpacity(0.2), 
                       shape: BoxShape.circle,
+                      border: isHighContrast ? Border.all(color: primaryColor) : null,
                     ),
-                    child: const Icon(Icons.directions_walk, color: Color(0xFF2DD4BF), size: 28),
+                    child: Icon(Icons.directions_walk, color: primaryColor, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Steps', style: TextStyle(color: Color(0xFF2DD4BF), fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('Steps', style: TextStyle(color: primaryColor, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
-                      // MOSTRA OS PASSOS REAIS
-                      Text('$_stepsToday', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                      Text('$_stepsToday', style: TextStyle(color: isHighContrast ? Colors.white : Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('of 10,000', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      Text('of 10,000', style: TextStyle(color: subTextColor, fontSize: 12)),
                     ],
                   ),
                 ],
@@ -261,31 +274,31 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   fit: StackFit.expand,
                   children: [
                     CircularProgressIndicator(
-                      value: stepProgress, // Atualiza a rodinha
+                      value: stepProgress, 
                       strokeWidth: 8,
-                      backgroundColor: Colors.white.withOpacity(0.05),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2DD4BF)),
+                      backgroundColor: isHighContrast ? Colors.grey[900] : Colors.white.withOpacity(0.05),
+                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
                     ),
-                    const Center(child: Icon(Icons.sync_alt, color: Colors.white54, size: 16)),
+                    Center(child: Icon(Icons.sync_alt, color: subTextColor, size: 16)),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          Divider(color: Colors.white.withOpacity(0.05), height: 1),
+          Divider(color: borderColor, height: 1, thickness: isHighContrast ? 2 : 1),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, color: Color(0xFF3B82F6), size: 18),
+                    Icon(Icons.location_on_outlined, color: isHighContrast ? Colors.white : const Color(0xFF3B82F6), size: 18),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Distance', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        Text('Distance', style: TextStyle(color: subTextColor, fontSize: 12)),
                         Text('${distanceKm.toStringAsFixed(1)} km', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                       ],
                     ),
@@ -295,12 +308,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(Icons.local_fire_department_outlined, color: Color(0xFF8B5CF6), size: 18),
+                    Icon(Icons.local_fire_department_outlined, color: isHighContrast ? Colors.white : const Color(0xFF8B5CF6), size: 18),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Calories', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        Text('Calories', style: TextStyle(color: subTextColor, fontSize: 12)),
                         Text('$caloriesBurned kcal', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                       ],
                     ),
@@ -315,12 +328,16 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _buildSleepCard() {
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final primaryColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFFC084FC);
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
       ),
       child: Column(
         children: [
@@ -332,18 +349,18 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.2), 
+                      color: isHighContrast ? Colors.transparent : const Color(0xFF8B5CF6).withOpacity(0.2), 
                       shape: BoxShape.circle,
+                      border: isHighContrast ? Border.all(color: primaryColor) : null,
                     ),
-                    child: const Icon(Icons.nightlight_round, color: Color(0xFFC084FC), size: 28),
+                    child: Icon(Icons.nightlight_round, color: primaryColor, size: 28),
                   ),
                   const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Sleep', style: TextStyle(color: Color(0xFFC084FC), fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('Sleep', style: TextStyle(color: primaryColor, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
-                      // MOSTRA AS HORAS DE SONO REAIS
                       Text('${_sleepHours}h ${_sleepMinutes}m', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -351,9 +368,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
               Column(
                 children: [
-                  const Icon(Icons.health_and_safety_outlined, color: Color(0xFF2DD4BF), size: 18),
+                  Icon(Icons.health_and_safety_outlined, color: isHighContrast ? Colors.white : const Color(0xFF2DD4BF), size: 18),
                   const SizedBox(height: 4),
-                  Text(_sleepHours >= 7 ? 'Good' : 'Needs Fix', style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(_sleepHours >= 7 ? 'Good' : 'Needs Fix', style: TextStyle(color: isHighContrast ? Colors.white : const Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -375,7 +392,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       BarChartRodData(
                         toY: heights[index].toDouble(),
                         width: 6,
-                        gradient: const LinearGradient(
+                        color: isHighContrast ? const Color(0xFFFFD600) : null,
+                        gradient: isHighContrast ? null : const LinearGradient(
                           colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,

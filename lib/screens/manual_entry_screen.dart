@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../app_data.dart';
+import '../app_data.dart'; // <-- Aceder à variável isHighContrast
 
 class ManualEntryScreen extends StatefulWidget {
   final String initialType; 
@@ -20,12 +20,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   late String _entryType; 
   bool _isLoadingBarcode = false; 
 
-  final Color bgColor = const Color(0xFF090C10);
-  final Color cardColor = const Color(0xFF141923);
-  final Gradient neonGradient = const LinearGradient(
-    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
-  );
-
   final List<String> _availableTags = ['🏋️ Pós-Treino', '🤒 Doente', '😤 Stress', '🏃 Ativo'];
   final List<String> _selectedTags = [];
 
@@ -34,7 +28,6 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     super.initState();
     _entryType = widget.initialType; 
     
-    // Sempre que o utilizador escreve os hidratos à mão, recalcula a insulina
     cCtrl.addListener(() {
       if (!_isLoadingBarcode && cCtrl.text.isNotEmpty) {
         _recalculateInsulinWithTags();
@@ -69,9 +62,101 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     iCtrl.text = baseInsulin.toStringAsFixed(1);
   }
 
+  // --- MOTOR HÁPTICO SEMÂNTICO (IPM) ---
+  Future<void> _triggerWarningHaptic() async {
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 150));
+    HapticFeedback.heavyImpact();
+  }
+
+  // --- LÓGICA DE GRAVAÇÃO E PREVENÇÃO DE ERROS ---
+  void _attemptToSave() {
+    double insulinDose = double.tryParse(iCtrl.text) ?? 0.0;
+
+    if (insulinDose >= 15.0) {
+      _triggerWarningHaptic();
+      _showSafetyWarningDialog(insulinDose);
+    } else {
+      HapticFeedback.mediumImpact();
+      _executeSave();
+    }
+  }
+
+  void _showSafetyWarningDialog(double dose) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isHighContrast ? Colors.black : const Color(0xFF1E1E2A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent, width: 2)
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent, size: 28),
+            const SizedBox(width: 10),
+            Text('Alerta de Segurança', style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'A dose calculada é de $dose U.\nIsto é invulgarmente alto e pode causar hipoglicemia severa. Tens a certeza que queres registar este valor?',
+          style: TextStyle(color: isHighContrast ? Colors.white : Colors.white70, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              Navigator.pop(context); 
+            },
+            child: Text('CORRIGIR', style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
+              foregroundColor: isHighContrast ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              Navigator.pop(context);
+              _executeSave(); 
+            },
+            child: const Text('CONFIRMAR', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _executeSave() {
+    final now = DateTime.now();
+    final safeTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    globalDiary.insert(0, {
+      'title': tCtrl.text.isEmpty ? 'Manual Log' : tCtrl.text, 
+      'carbs': double.tryParse(cCtrl.text) ?? 0.0, 
+      'insulin': double.tryParse(iCtrl.text) ?? 0.0, 
+      'time': safeTime, 
+      'type': _entryType, 
+      'imagePath': null,
+      'tags': List<String>.from(_selectedTags) 
+    }); 
+    
+    saveData(); 
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('✅ Registo guardado!', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontWeight: FontWeight.bold)), 
+      backgroundColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF)
+    )); 
+    Navigator.of(context).pop(); 
+  }
+
+  // --- SCANNER ---
   Future<void> _scanBarcode() async {
     HapticFeedback.lightImpact();
     MobileScannerController cameraController = MobileScannerController();
+
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
 
     try {
       String? barcodeScanRes = await Navigator.push<String>(
@@ -80,9 +165,9 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
           builder: (context) => Scaffold(
             backgroundColor: bgColor,
             appBar: AppBar(
-              title: const Text('Digitalizar Código', style: TextStyle(color: Colors.white, fontSize: 16)),
+              title: Text('Digitalizar Código', style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, fontSize: 16)),
               backgroundColor: cardColor,
-              iconTheme: const IconThemeData(color: Colors.white),
+              iconTheme: IconThemeData(color: isHighContrast ? const Color(0xFFFFD600) : Colors.white),
             ),
             body: Stack(
               children: [
@@ -94,7 +179,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                       final String? code = barcodes.first.rawValue;
                       if (code != null) {
                         cameraController.stop(); 
-                        HapticFeedback.mediumImpact();
+                        HapticFeedback.mediumImpact(); 
                         Navigator.pop(context, code);
                       }
                     }
@@ -105,7 +190,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                     width: 250,
                     height: 150,
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFF2DD4BF), width: 3),
+                      border: Border.all(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF), width: 3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -130,9 +215,15 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               cCtrl.text = (double.tryParse((product['nutriments']?['carbohydrates_100g'] ?? 0).toString()) ?? 0.0).toStringAsFixed(1); 
               _recalculateInsulinWithTags(); 
             });
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Produto adicionado!'), backgroundColor: Color(0xFF2DD4BF)));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('✅ Produto adicionado!', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontWeight: FontWeight.bold)), 
+              backgroundColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF)
+            ));
           } else {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Produto não encontrado na base de dados.'), backgroundColor: Colors.orangeAccent));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('⚠️ Produto não encontrado.', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontWeight: FontWeight.bold)), 
+              backgroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.orangeAccent
+            ));
           }
         }
       }
@@ -144,22 +235,27 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     }
   }
 
-  InputDecoration _customInputDeco(String label, String suffix) {
+  InputDecoration _customInputDeco(String label, String suffix, Color cardColor, Color borderColor, Color mainTextColor) {
     return InputDecoration(
       labelText: label, 
-      labelStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+      labelStyle: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 14),
       suffixText: suffix, 
-      suffixStyle: const TextStyle(color: Colors.white54),
+      suffixStyle: TextStyle(color: isHighContrast ? Colors.white : Colors.white54),
       filled: true, 
       fillColor: cardColor,
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.05))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor, width: isHighContrast ? 2 : 1)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6), width: 2)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
@@ -173,10 +269,10 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                   children: [
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                      child: Icon(Icons.arrow_back_ios_new, color: mainTextColor, size: 20),
                     ),
                     const SizedBox(width: 12),
-                    const Text('Log Entry', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                    Text('Log Entry', style: TextStyle(color: mainTextColor, fontSize: 26, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 Container(
@@ -184,9 +280,9 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                   decoration: BoxDecoration(
                     color: cardColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
                   ),
-                  child: const Icon(Icons.edit_note, color: Colors.white54, size: 20),
+                  child: Icon(Icons.edit_note, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white54, size: 20),
                 ),
               ],
             ),
@@ -197,6 +293,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               decoration: BoxDecoration(
                 color: cardColor,
                 borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: isHighContrast ? const Color(0xFFFFD600) : Colors.transparent, width: isHighContrast ? 2 : 0),
               ),
               child: Row(
                 children: [
@@ -212,29 +309,29 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search food or scan barcode',
-                hintStyle: const TextStyle(color: Colors.white38),
-                prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                hintStyle: TextStyle(color: isHighContrast ? Colors.white54 : Colors.white38),
+                prefixIcon: Icon(Icons.search, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white54),
                 suffixIcon: IconButton(
                   icon: _isLoadingBarcode 
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
-                      : const Icon(Icons.qr_code_scanner, color: Colors.white54),
+                      ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white54))
+                      : Icon(Icons.qr_code_scanner, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white54),
                   onPressed: _isLoadingBarcode ? null : _scanBarcode,
                 ),
                 filled: true,
                 fillColor: cardColor,
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: Colors.white.withOpacity(0.05))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: borderColor, width: isHighContrast ? 2 : 1)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6), width: 2)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
             ),
             const SizedBox(height: 16),
             
-            TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Carbs', 'g')), 
+            TextField(controller: cCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Carbs', 'g', cardColor, borderColor, mainTextColor)), 
             const SizedBox(height: 16),
-            TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Insulin', 'U')), 
+            TextField(controller: iCtrl, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _customInputDeco('Insulin', 'U', cardColor, borderColor, mainTextColor)), 
             const SizedBox(height: 24),
             
-            const Text('Tags', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text('Tags', style: TextStyle(color: mainTextColor, fontSize: 14, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8.0,
@@ -242,17 +339,17 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               children: _availableTags.map((tag) {
                 final isSelected = _selectedTags.contains(tag);
                 return FilterChip(
-                  label: Text(tag, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  label: Text(tag, style: TextStyle(color: isSelected ? Colors.black : (isHighContrast ? Colors.white : Colors.white70), fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                   selected: isSelected,
-                  selectedColor: const Color(0xFF3B82F6),
+                  selectedColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6),
                   backgroundColor: cardColor,
-                  checkmarkColor: Colors.white,
+                  checkmarkColor: Colors.black,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20), 
-                    side: BorderSide(color: isSelected ? Colors.transparent : Colors.white.withOpacity(0.05))
+                    side: BorderSide(color: isSelected ? Colors.transparent : borderColor, width: isHighContrast ? 2 : 1)
                   ),
                   onSelected: (bool selected) {
-                    HapticFeedback.lightImpact();
+                    HapticFeedback.lightImpact(); 
                     setState(() {
                       if (selected) {
                         _selectedTags.add(tag);
@@ -268,39 +365,20 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
             const SizedBox(height: 40),
             
             GestureDetector(
-              onTap: () { 
-                HapticFeedback.mediumImpact(); 
-                
-                final now = DateTime.now();
-                // FIX: Hora sempre formatada com 2 dígitos (ex: 09:05) para o IOB não quebrar
-                final safeTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-
-                globalDiary.insert(0, {
-                  'title': tCtrl.text.isEmpty ? 'Manual Log' : tCtrl.text, 
-                  'carbs': double.tryParse(cCtrl.text) ?? 0.0, 
-                  'insulin': double.tryParse(iCtrl.text) ?? 0.0, 
-                  'time': safeTime, 
-                  'type': _entryType, 
-                  'imagePath': null,
-                  'tags': List<String>.from(_selectedTags) 
-                }); 
-                
-                saveData(); 
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Logged!'), backgroundColor: Color(0xFF2DD4BF))); 
-                Navigator.of(context).pop(); 
-              }, 
+              onTap: _attemptToSave, 
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(
-                  gradient: neonGradient,
+                  color: isHighContrast ? const Color(0xFFFFD600) : null,
+                  gradient: isHighContrast ? null : const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)]),
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
+                  boxShadow: isHighContrast ? null : [
                     BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
                   ],
                 ),
-                child: const Center(
-                  child: Text('Save Log', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Center(
+                  child: Text('Save Log', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
@@ -313,23 +391,32 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
 
   Widget _buildTypeTab(String typeValue, String label) {
     final isSelected = _entryType == typeValue;
+    
+    BoxDecoration? decoration;
+    if (isSelected) {
+      decoration = isHighContrast 
+          ? BoxDecoration(color: const Color(0xFFFFD600), borderRadius: BorderRadius.circular(24))
+          : BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)]), borderRadius: BorderRadius.circular(24));
+    }
+
+    final textColor = isSelected 
+        ? (isHighContrast ? Colors.black : Colors.white) 
+        : (isHighContrast ? Colors.white : Colors.white54);
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          HapticFeedback.selectionClick();
+          HapticFeedback.selectionClick(); 
           setState(() => _entryType = typeValue);
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            gradient: isSelected ? neonGradient : null,
-            borderRadius: BorderRadius.circular(24),
-          ),
+          decoration: decoration,
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white54,
+                color: textColor,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),

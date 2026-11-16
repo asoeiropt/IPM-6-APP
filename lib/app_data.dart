@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:core';
 import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +25,83 @@ bool isFirstTime = true;
 bool isLoggedIn = false; 
 bool askedForNotifications = false; 
 bool useBiometricsGlobal = false; 
+bool isHighContrast = false; // <-- NOVA VARIÁVEL DE ACESSIBILIDADE
+
+// ==========================================
+// MOTOR DE NOTIFICAÇÕES ACIONÁVEIS (IPM)
+// ==========================================
+Future<void> initNotifications() async {
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  final DarwinInitializationSettings initializationSettingsDarwin = DarwinInitializationSettings(
+    requestAlertPermission: true,
+    requestBadgePermission: true,
+    requestSoundPermission: true,
+  );
+  
+  final InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsDarwin,
+  );
+
+  await notificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      if (response.actionId == 'action_juice') {
+        HapticFeedback.heavyImpact();
+        
+        final now = DateTime.now();
+        final safeTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+        // Regista automaticamente os 15g de hidratos (Regra dos 15)
+        globalDiary.insert(0, {
+          'title': '🧃 Sumo de Resgate (IA)', 
+          'carbs': 15.0, 
+          'insulin': 0.0, 
+          'time': safeTime, 
+          'type': 'correction', 
+          'imagePath': null,
+          'tags': ['⚠️ Hipo Acionada'] 
+        });
+        
+        await saveData();
+        debugPrint("✅ 15g de Sumo registados pela notificação!");
+      }
+    },
+  );
+}
+
+Future<void> triggerHypoAlert() async {
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'hypo_channel',
+    'Hypoglycemia Alerts',
+    channelDescription: 'Alertas preditivos de IA',
+    importance: Importance.max,
+    priority: Priority.high,
+    color: Color(0xFFF43F5E), 
+    enableVibration: true,
+    actions: <AndroidNotificationAction>[
+      AndroidNotificationAction(
+        'action_juice', 
+        '🧃 Registar 15g Sumo', 
+        showsUserInterface: true,
+      ),
+      AndroidNotificationAction(
+        'action_ignore', 
+        'Ignorar',
+        showsUserInterface: true,
+      ),
+    ],
+  );
+
+  const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+
+  await notificationsPlugin.show(
+    0,
+    '🚨 Alerta Preditivo (CGM)',
+    'Glicemia em queda acentuada (⬇️ 68 mg/dL estimados em 10m). Toma hidratos rápidos!',
+    platformDetails,
+  );
+}
 
 // ==========================================
 // MOTOR MATEMÁTICO: INSULIN ON BOARD (IOB)
@@ -66,23 +145,19 @@ Future<void> loadData() async {
   isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
   askedForNotifications = prefs.getBool('askedForNotifications') ?? false;
   useBiometricsGlobal = prefs.getBool('useBiometrics') ?? false; 
+  isHighContrast = prefs.getBool('isHighContrast') ?? false; 
 
   final String? diaryString = prefs.getString('diary');
   if (diaryString != null) {
     globalDiary = (jsonDecode(diaryString) as List).map((e) => Map<String, dynamic>.from(e)).toList();
   } else {
-    globalDiary = [
-      {'title': 'Almoço: Bife', 'carbs': 45.0, 'insulin': 3.5, 'time': '13:00', 'type': 'meal', 'imagePath': null},
-      {'title': 'Correção', 'carbs': 0.0, 'insulin': 2.0, 'time': '10:30', 'type': 'correction', 'imagePath': null},
-    ];
+    globalDiary = [];
   }
 
-  // 3. CARREGAR OU GERAR DADOS DO GRÁFICO
   final String? glucoseString = prefs.getString('glucose');
   if (glucoseString != null) {
     globalGlucose = (jsonDecode(glucoseString) as List).map((e) => Map<String, dynamic>.from(e)).toList();
   } else {
-    // Se for a primeira vez, gera dados de teste para a última hora
     final now = DateTime.now();
     globalGlucose = [
       {'time': now.subtract(const Duration(minutes: 60)).toIso8601String(), 'value': 110.0},
@@ -91,11 +166,10 @@ Future<void> loadData() async {
       {'time': now.subtract(const Duration(minutes: 30)).toIso8601String(), 'value': 145.0},
       {'time': now.subtract(const Duration(minutes: 20)).toIso8601String(), 'value': 135.0},
       {'time': now.subtract(const Duration(minutes: 10)).toIso8601String(), 'value': 115.0},
-      {'time': now.toIso8601String(), 'value': 112.0}, // Glicemia Atual
+      {'time': now.toIso8601String(), 'value': 112.0},
     ];
   }
 
-  // Dinamizamos o Widget nativo para receber o último valor do gráfico
   String currentGlucose = globalGlucose.isNotEmpty ? globalGlucose.last['value'].toInt().toString() : '---';
   await updateHomeWidget(currentGlucose, '➡️', calculateIOB().toStringAsFixed(1));
 }
@@ -109,9 +183,10 @@ Future<void> saveData() async {
   await prefs.setBool('isLoggedIn', isLoggedIn);
   await prefs.setBool('askedForNotifications', askedForNotifications);
   await prefs.setBool('useBiometrics', useBiometricsGlobal); 
+  await prefs.setBool('isHighContrast', isHighContrast); 
   
   await prefs.setString('diary', jsonEncode(globalDiary));
-  await prefs.setString('glucose', jsonEncode(globalGlucose)); // Grava a glicose
+  await prefs.setString('glucose', jsonEncode(globalGlucose)); 
 
   String currentGlucose = globalGlucose.isNotEmpty ? globalGlucose.last['value'].toInt().toString() : '---';
   await updateHomeWidget(currentGlucose, '➡️', calculateIOB().toStringAsFixed(1));

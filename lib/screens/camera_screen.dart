@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
-import '../app_data.dart';
+import '../app_data.dart'; // Acesso ao isHighContrast
 
-// --- CORES BASE DO NOVO DESIGN ---
-const Color bgColor = Color(0xFF090C10);
-const Color cardColor = Color(0xFF141923);
-const Gradient neonGradient = LinearGradient(
+// --- CORES BASE DO DESIGN PADRÃO ---
+const Color defaultBgColor = Color(0xFF090C10);
+const Color defaultCardColor = Color(0xFF141923);
+const Gradient defaultNeonGradient = LinearGradient(
   colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
 );
 
@@ -88,16 +88,16 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized || _controller == null) {
-      return const Scaffold(
-        backgroundColor: bgColor,
+      return Scaffold(
+        backgroundColor: isHighContrast ? Colors.black : defaultBgColor,
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
+          child: CircularProgressIndicator(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6)),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.black, // O fundo de ecrã da câmara fica mesmo preto para contraste
+      backgroundColor: Colors.black, // A câmara é sempre preta para máximo contraste
       body: SizedBox.expand(
         child: Stack(
           children: [
@@ -112,7 +112,6 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
             
-            // Blur/Degradé no topo e fundo para melhorar a interface
             Positioned(
               top: 0, left: 0, right: 0,
               child: Container(
@@ -120,7 +119,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                    colors: [Colors.black.withOpacity(0.9), Colors.transparent], // Aumentei opacidade para garantir leitura
                   )
                 ),
               ),
@@ -143,11 +142,12 @@ class _CameraScreenState extends State<CameraScreen> {
               left: 16,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withOpacity(0.7),
                   shape: BoxShape.circle,
+                  border: isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 2) : null,
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                  icon: Icon(Icons.close, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, size: 24),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -157,7 +157,16 @@ class _CameraScreenState extends State<CameraScreen> {
               top: MediaQuery.of(context).padding.top + 28,
               left: 0,
               right: 0,
-              child: const Text('Scan your meal', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)])),
+              child: Text(
+                'Scan your meal', 
+                textAlign: TextAlign.center, 
+                style: TextStyle(
+                  color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, 
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold, 
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 8)]
+                )
+              ),
             ),
 
             Positioned(
@@ -166,7 +175,7 @@ class _CameraScreenState extends State<CameraScreen> {
               right: 0,
               child: Center(
                 child: _isTakingPicture
-                    ? const CircularProgressIndicator(color: Color(0xFF3B82F6))
+                    ? CircularProgressIndicator(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6))
                     : GestureDetector(
                         onTap: _takePicture,
                         child: Container(
@@ -174,16 +183,16 @@ class _CameraScreenState extends State<CameraScreen> {
                           height: 80,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 4),
-                            color: Colors.white.withOpacity(0.2),
+                            border: Border.all(color: isHighContrast ? const Color(0xFFFFD600) : Colors.white, width: 4),
+                            color: isHighContrast ? Colors.black.withOpacity(0.5) : Colors.white.withOpacity(0.2),
                           ),
                           child: Center(
                             child: Container(
                               width: 60,
                               height: 60,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Colors.white,
+                                color: isHighContrast ? const Color(0xFFFFD600) : Colors.white,
                               ),
                             ),
                           ),
@@ -219,14 +228,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
   
   @override
   Widget build(BuildContext context) {
+    final bgColor = isHighContrast ? Colors.black : defaultBgColor;
+    final textColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text('AI Analysis', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)), 
+        title: Text('AI Analysis', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)), 
         backgroundColor: Colors.transparent, 
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: textColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -239,10 +251,11 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
               height: 300, 
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
+                border: isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 2) : null,
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(isHighContrast ? 22 : 24),
                 child: Image.file(File(widget.imagePath), fit: BoxFit.cover),
               ),
             ), 
@@ -256,21 +269,28 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
   }
 
   Widget _buildLoadingState() {
+    final primaryColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF3B82F6);
+    
     return Padding(
       padding: const EdgeInsets.all(40.0),
       child: Column(
-        children: const [
-          CircularProgressIndicator(color: Color(0xFF3B82F6), strokeWidth: 3), 
-          SizedBox(height: 24), 
-          Text('Processing vision model...', style: TextStyle(color: Colors.white54, fontSize: 14)),
-          SizedBox(height: 8),
-          Text('Identifying ingredients & macros', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12, fontWeight: FontWeight.bold)),
+        children: [
+          CircularProgressIndicator(color: primaryColor, strokeWidth: 3), 
+          const SizedBox(height: 24), 
+          Text('Processing vision model...', style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 14)),
+          const SizedBox(height: 8),
+          Text('Identifying ingredients & macros', style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.bold)),
         ]
       ),
     );
   }
 
   Widget _buildResultState() {
+    final bgColor = isHighContrast ? Colors.black : defaultBgColor;
+    final cardColor = isHighContrast ? Colors.black : defaultCardColor;
+    final primaryColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+
     return Padding(
       padding: const EdgeInsets.all(20.0), 
       child: Column(
@@ -281,7 +301,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
             decoration: BoxDecoration(
               color: cardColor, 
               borderRadius: BorderRadius.circular(24), 
-              border: Border.all(color: Colors.white.withOpacity(0.05))
+              border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1)
             ), 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start, 
@@ -290,18 +310,22 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(color: const Color(0xFF2DD4BF).withOpacity(0.2), shape: BoxShape.circle),
-                      child: const Icon(Icons.check, color: Color(0xFF2DD4BF), size: 16),
+                      decoration: BoxDecoration(
+                        color: isHighContrast ? Colors.transparent : const Color(0xFF2DD4BF).withOpacity(0.2), 
+                        shape: BoxShape.circle,
+                        border: isHighContrast ? Border.all(color: primaryColor) : null,
+                      ),
+                      child: Icon(Icons.check, color: primaryColor, size: 16),
                     ), 
                     const SizedBox(width: 12), 
-                    const Text('MATCH FOUND', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: Color(0xFF2DD4BF))),
+                    Text('MATCH FOUND', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: primaryColor)),
                   ]
                 ), 
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16), 
-                  child: Divider(height: 1, color: Colors.white.withOpacity(0.05))
+                  child: Divider(height: 1, color: isHighContrast ? primaryColor : Colors.white.withOpacity(0.05), thickness: isHighContrast ? 2 : 1)
                 ), 
-                const Text('Steak with Rice', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)), 
+                Text('Steak with Rice', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white)), 
                 const SizedBox(height: 24), 
                 
                 Row(
@@ -309,13 +333,17 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.all(16), 
-                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(16)), 
+                        decoration: BoxDecoration(
+                          color: bgColor, 
+                          borderRadius: BorderRadius.circular(16),
+                          border: isHighContrast ? Border.all(color: primaryColor, width: 2) : null,
+                        ), 
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text('CARBS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: Colors.white54)),
-                            SizedBox(height: 4), 
-                            Text('45g', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                          children: [
+                            Text('CARBS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1, color: isHighContrast ? Colors.white : Colors.white54)),
+                            const SizedBox(height: 4), 
+                            Text('45g', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white)),
                           ]
                         ),
                       ),
@@ -325,16 +353,18 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16), 
                         decoration: BoxDecoration(
-                          gradient: neonGradient, 
+                          color: isHighContrast ? Colors.black : null,
+                          gradient: isHighContrast ? null : defaultNeonGradient, 
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                          border: isHighContrast ? Border.all(color: primaryColor, width: 2) : null,
+                          boxShadow: isHighContrast ? null : [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
                         ), 
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('SUGGESTED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white70)),
+                            Text('SUGGESTED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1, color: isHighContrast ? Colors.white : Colors.white70)),
                             const SizedBox(height: 4), 
-                            Text('${(45 / globalIcr).toStringAsFixed(1)} U', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                            Text('${(45 / globalIcr).toStringAsFixed(1)} U', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isHighContrast ? const Color(0xFFFFD600) : Colors.white)),
                           ]
                         ),
                       ),
@@ -358,7 +388,7 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isHighContrast ? const Color(0xFFFFD600) : Colors.white,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Center(
@@ -373,10 +403,10 @@ class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
               HapticFeedback.lightImpact();
               Navigator.of(context).pop();
             },
-            child: const Center(
+            child: Center(
               child: Padding(
-                padding: EdgeInsets.all(12.0),
-                child: Text('Discard', style: TextStyle(color: Colors.white54, fontSize: 15, fontWeight: FontWeight.w600)),
+                padding: const EdgeInsets.all(12.0),
+                child: Text('Discard', style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ),
           )

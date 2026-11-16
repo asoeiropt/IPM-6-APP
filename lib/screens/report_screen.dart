@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '../app_data.dart'; // Para aceder ao globalDiary
+import '../app_data.dart'; 
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -13,10 +13,7 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-  final Color bgColor = const Color(0xFF090C10);
-  final Color cardColor = const Color(0xFF141923);
 
-  // --- LÓGICA DE PDF MANTIDA INTACTA ---
   Future<Uint8List> _generateMedicalReport(PdfPageFormat format) async {
     final pdf = pw.Document(version: PdfVersion.pdf_1_5, compress: true);
     
@@ -25,8 +22,8 @@ class _ReportScreenState extends State<ReportScreen> {
     int entriesCount = globalDiary.length;
     
     for (var entry in globalDiary) {
-      totalCarbs += (entry['carbs'] ?? 0);
-      totalInsulin += (entry['insulin'] ?? 0);
+      totalCarbs += (double.tryParse(entry['carbs'].toString()) ?? 0.0);
+      totalInsulin += (double.tryParse(entry['insulin'].toString()) ?? 0.0);
     }
 
     pdf.addPage(
@@ -172,27 +169,34 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // --- NOVA INTERFACE GRÁFICA (Lista Visual + Swipe to Delete) ---
   @override
   Widget build(BuildContext context) {
+    // --- LÓGICA DE ALTO CONTRASTE ---
+    final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: mainTextColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Diário', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Diário', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: mainTextColor)),
         centerTitle: true,
         actions: [
-          // Botão que gera o PDF e abre a caixa nativa de partilha/impressão
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF2DD4BF)),
+            icon: Icon(Icons.picture_as_pdf, color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF)),
             onPressed: () async {
+              HapticFeedback.lightImpact();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('A gerar PDF...'), duration: Duration(seconds: 1)),
+                SnackBar(
+                  content: Text('A gerar PDF...', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontWeight: FontWeight.bold)), 
+                  duration: const Duration(seconds: 1),
+                  backgroundColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF)
+                ),
               );
               await Printing.layoutPdf(
                 onLayout: (PdfPageFormat format) async => await _generateMedicalReport(format),
@@ -204,49 +208,71 @@ class _ReportScreenState extends State<ReportScreen> {
         ],
       ),
       body: globalDiary.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'Sem registos hoje.\nVai à Home para adicionar.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54, fontSize: 16),
+                style: TextStyle(color: isHighContrast ? Colors.white : Colors.white54, fontSize: 16),
               ),
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: globalDiary.length,
               itemBuilder: (context, index) {
-                // Invertemos a ordem para os registos mais recentes aparecerem no topo
                 final reversedIndex = globalDiary.length - 1 - index;
                 final entry = globalDiary[reversedIndex];
 
                 return Dismissible(
-                  // Usamos um UniqueKey para o Flutter não se perder ao apagar linhas
                   key: UniqueKey(),
                   direction: DismissDirection.endToStart,
                   background: Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent,
+                      color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
-                    child: const Icon(Icons.delete_outline, color: Colors.white, size: 30),
+                    child: Icon(Icons.delete_outline, color: isHighContrast ? Colors.black : Colors.white, size: 30),
                   ),
                   onDismissed: (direction) {
+                    HapticFeedback.heavyImpact(); // Feedback ao apagar (Segurança)
+                    
+                    final removedEntry = entry;
+                    final removedIndex = reversedIndex;
                     final removedTitle = entry['title'];
                     
                     setState(() {
-                      globalDiary.removeAt(reversedIndex);
+                      globalDiary.removeAt(removedIndex);
                     });
-                    
-                    saveData(); // Grava a eliminação na base de dados
+                    saveData();
 
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('$removedTitle apagado com sucesso.'),
-                        backgroundColor: Colors.redAccent,
-                        duration: const Duration(seconds: 2),
+                        content: Text('$removedTitle apagado.', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
+                        backgroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
+                        duration: const Duration(seconds: 5), 
+                        action: SnackBarAction(
+                          label: 'DESFAZER',
+                          textColor: isHighContrast ? Colors.black : Colors.white,
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              globalDiary.insert(removedIndex, removedEntry);
+                            });
+                            saveData();
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Registo recuperado com sucesso!', style: TextStyle(color: isHighContrast ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
+                                backgroundColor: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF2DD4BF),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     );
                   },
@@ -257,20 +283,24 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // Desenha os cartões na lista baseados no tipo (Refeição, Medicação, etc)
   Widget _buildLogCard(Map<String, dynamic> entry) {
     final isMedication = entry['type'] == 'medication';
-    final isMeal = entry['carbs'] != null && entry['carbs'] > 0;
+    final isMeal = entry['carbs'] != null && (double.tryParse(entry['carbs'].toString()) ?? 0.0) > 0;
+    
+    final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
+    final borderColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white.withOpacity(0.05);
+    final mainTextColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
+    final subTextColor = isHighContrast ? Colors.white : Colors.white54;
     
     IconData icon = Icons.water_drop;
-    Color iconColor = const Color(0xFFE81CFF); // Rosa para correções (Insulina pura)
+    Color iconColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFFE81CFF); 
     
     if (isMedication) {
       icon = Icons.medication;
-      iconColor = const Color(0xFF8B5CF6); // Roxo para comprimidos/medicação
+      iconColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFF8B5CF6); 
     } else if (isMeal) {
       icon = Icons.restaurant;
-      iconColor = const Color(0xFFD29C46); // Laranja para comida
+      iconColor = isHighContrast ? const Color(0xFFFFD600) : const Color(0xFFD29C46); 
     }
 
     return Container(
@@ -279,15 +309,16 @@ class _ReportScreenState extends State<ReportScreen> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: borderColor, width: isHighContrast ? 2 : 1),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
+              color: isHighContrast ? Colors.transparent : iconColor.withOpacity(0.15),
               shape: BoxShape.circle,
+              border: isHighContrast ? Border.all(color: iconColor) : null,
             ),
             child: Icon(icon, color: iconColor, size: 24),
           ),
@@ -296,13 +327,13 @@ class _ReportScreenState extends State<ReportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry['title']?.toString() ?? 'Registo', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(entry['title']?.toString() ?? 'Registo', style: TextStyle(color: mainTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.access_time, color: Colors.white54, size: 14),
+                    Icon(Icons.access_time, color: subTextColor, size: 14),
                     const SizedBox(width: 4),
-                    Text(entry['time']?.toString() ?? '--:--', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                    Text(entry['time']?.toString() ?? '--:--', style: TextStyle(color: subTextColor, fontSize: 13)),
                   ],
                 ),
               ],
@@ -311,10 +342,10 @@ class _ReportScreenState extends State<ReportScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (entry['insulin'] != null && entry['insulin'] > 0)
-                Text('${entry['insulin']} U', style: const TextStyle(color: Color(0xFFE45C96), fontSize: 15, fontWeight: FontWeight.bold)),
-              if (entry['carbs'] != null && entry['carbs'] > 0)
-                Text('${entry['carbs']} g', style: const TextStyle(color: Color(0xFFD29C46), fontSize: 15, fontWeight: FontWeight.bold)),
+              if (entry['insulin'] != null && (double.tryParse(entry['insulin'].toString()) ?? 0.0) > 0)
+                Text('${entry['insulin']} U', style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFFE45C96), fontSize: 15, fontWeight: FontWeight.bold)),
+              if (entry['carbs'] != null && (double.tryParse(entry['carbs'].toString()) ?? 0.0) > 0)
+                Text('${entry['carbs']} g', style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : const Color(0xFFD29C46), fontSize: 15, fontWeight: FontWeight.bold)),
             ],
           )
         ],
