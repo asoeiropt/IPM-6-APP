@@ -465,6 +465,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // --- CAMPO EMAIL COM FOCO EXPLÍCITO ---
                 TextField(
                   controller: _emailController,
+                  autofocus: true,
                   focusNode: _emailFocus, 
                   keyboardType: TextInputType.emailAddress, 
                   textInputAction: TextInputAction.next,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; // <-- NECESSÁRIO PARA O FIRESTORE
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
 import '../app_data.dart'; 
@@ -14,37 +15,27 @@ class DoctorDashboard extends StatefulWidget {
 }
 
 class _DoctorDashboardState extends State<DoctorDashboard> {
-  // --- ESTADO DINÂMICO DAS CONSULTAS ---
-  final List _appointments = [
-    {
-      'time': '9:30 AM',
-      'patientName': 'João Antunes',
-      'type': 'Revisão Mensal (Remarcada)',
-      'statusColor': const Color(0xFF2DD4BF),
-      'initials': 'JA',
-      'isCompleted': false,
-    },
-    {
-      'time': '11:00 AM',
-      'patientName': 'Maria Silva',
-      'type': 'Ajuste de Insulina',
-      'statusColor': const Color(0xFFE81CFF),
-      'initials': 'MS',
-      'isCompleted': false,
-    }
-  ];
-
   final List<String> _availableSlots = ["9:00 AM", "9:30 AM", "11:00 AM", "2:30 PM", "4:00 PM"];
 
   // ==============================================================
-  // CALENDÁRIO INTERATIVO DIRETO (IGUAL AO DO PACIENTE)
+  // ATUALIZAR CONSULTA DIRETAMENTE NO FIRESTORE
   // ==============================================================
-  void _showCalendarBottomSheet(int appointmentIndex) {
+  Future<void> _updateAppointmentInFirestore(String docId, Map<String, dynamic> updatedData) async {
+    try {
+      await FirebaseFirestore.instance.collection('appointments').doc(docId).update(updatedData);
+    } catch (e) {
+      debugPrint("Erro ao atualizar no Firestore: $e");
+    }
+  }
+
+  // ==============================================================
+  // CALENDÁRIO INTERATIVO DIRETO (COM GRAVAÇÃO NA CLOUD)
+  // ==============================================================
+  void _showCalendarBottomSheet(String docId, Map<String, dynamic> appt) {
     HapticFeedback.mediumImpact();
-    final appt = _appointments[appointmentIndex];
     
     DateTime tempSelectedDate = DateTime.now().add(const Duration(days: 1)); // Amanhã
-    String tempSelectedTime = ""; // Começa vazio para obrigar a escolher
+    String tempSelectedTime = ""; 
 
     final bgColor = isHighContrast ? Colors.black : const Color(0xFF141923);
     final textColor = isHighContrast ? const Color(0xFFFFD600) : Colors.white;
@@ -190,15 +181,18 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                   const SizedBox(height: 40),
 
                   GestureDetector(
-                    onTap: tempSelectedTime.isEmpty ? null : () {
+                    onTap: tempSelectedTime.isEmpty ? null : () async {
                       HapticFeedback.heavyImpact();
-                      setState(() {
-                        // Atualiza a hora no cartão da médica
-                        _appointments[appointmentIndex]['time'] = tempSelectedTime;
+                      
+                      // GRAVA NO FIRESTORE A HORA E A DATA
+                      await _updateAppointmentInFirestore(docId, {
+                        'time': tempSelectedTime,
+                        // Formata a data escolhida para o formato DD/MM/YYYY
+                        'date': DateFormat('dd/MM/yyyy').format(tempSelectedDate), 
                       });
+
                       Navigator.pop(context);
                       
-                      // O TEU TOP SNACKBAR AQUI (Igual ao do CareTab)
                       showTopSnackBar(
                         Overlay.of(context),
                         CustomSnackBar.success(
@@ -286,151 +280,175 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           )
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('Olá, Dra. Joana 👋', style: TextStyle(color: mainTextColor, fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text('Tens 1 alerta crítico e ${_appointments.length} consultas hoje.', style: TextStyle(color: subTextColor, fontSize: 14)),
-          const SizedBox(height: 24),
+      // USAMOS O STREAMBUILDER PARA LER AS CONSULTAS EM TEMPO REAL DO FIRESTORE
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('appointments').snapshots(),
+        builder: (context, snapshot) {
+          // Se ainda estiver a carregar, mostra um indicador de progresso elegante
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          // --- ALERTA SOS ---
-          Text('Alertas Urgentes', style: TextStyle(color: mainTextColor, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Container(
+          // Se a coleção estiver vazia, podes preencher documentos de teste ou mostrar lista vazia
+          final docs = snapshot.data?.docs ?? [];
+
+          return ListView(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isHighContrast ? Colors.black : Colors.redAccent.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent, width: 2),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                  child: const Icon(Icons.sos, color: Colors.white, size: 24),
+            children: [
+              Text('Olá, Dra. Joana 👋', style: TextStyle(color: mainTextColor, fontSize: 28, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('Tens 1 alerta crítico e ${docs.length} consultas hoje.', style: TextStyle(color: subTextColor, fontSize: 14)),
+              const SizedBox(height: 24),
+
+              // --- ALERTA SOS ---
+              Text('Alertas Urgentes', style: TextStyle(color: mainTextColor, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isHighContrast ? Colors.black : Colors.redAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent, width: 2),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                      child: const Icon(Icons.sos, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('João Antunes', style: TextStyle(color: mainTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text('Agora', style: TextStyle(color: isHighContrast ? Colors.white : Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Glicemia a 68 mg/dL em queda. O paciente acionou o SOS no Care Hub.', style: TextStyle(color: subTextColor, fontSize: 13, height: 1.4)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                HapticFeedback.heavyImpact();
-                              },
-                              icon: const Icon(Icons.call, size: 18),
-                              label: const Text('Ligar', style: TextStyle(fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
-                                foregroundColor: isHighContrast ? Colors.black : Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('João Antunes', style: TextStyle(color: mainTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text('Agora', style: TextStyle(color: isHighContrast ? Colors.white : Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.push(context, MaterialPageRoute(builder: (_) => const DoctorChatScreen(
-                                  patientName: 'João Antunes',
-                                  patientInitials: 'JA', initialMessages: [],
-                                )));
-                              },
-                              icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                              label: const Text('Chat SOS', style: TextStyle(fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isHighContrast ? Colors.black : Colors.redAccent.withOpacity(0.15),
-                                foregroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent.withOpacity(0.5)),
+                          const SizedBox(height: 4),
+                          Text('Glicemia a 68 mg/dL em queda. O paciente acionou o SOS no Care Hub.', style: TextStyle(color: subTextColor, fontSize: 13, height: 1.4)),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    HapticFeedback.heavyImpact();
+                                  },
+                                  icon: const Icon(Icons.call, size: 18),
+                                  label: const Text('Ligar', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
+                                    foregroundColor: isHighContrast ? Colors.black : Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    HapticFeedback.lightImpact();
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DoctorChatScreen(
+                                      patientName: 'João Antunes',
+                                      patientInitials: 'JA', initialMessages: [],
+                                    )));
+                                  },
+                                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                  label: const Text('Chat SOS', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isHighContrast ? Colors.black : Colors.redAccent.withOpacity(0.15),
+                                    foregroundColor: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(color: isHighContrast ? const Color(0xFFFFD600) : Colors.redAccent.withOpacity(0.5)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
                         ],
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // --- CALENDÁRIO DE PACIENTES ---
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Consultas de Hoje', style: TextStyle(color: mainTextColor, fontSize: 18, fontWeight: FontWeight.bold)),
-              Icon(Icons.calendar_month, color: subTextColor, size: 20),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Gera a lista de consultas dinamicamente
-          ...List.generate(_appointments.length, (index) {
-            final appt = _appointments[index];
-            return _buildPatientSlot(
-              time: appt['time'],
-              patientName: appt['patientName'],
-              type: appt['type'],
-              statusColor: appt['statusColor'],
-              isCompleted: appt['isCompleted'],
-              cardColor: cardColor,
-              borderColor: borderColor,
-              mainTextColor: mainTextColor,
-              subTextColor: subTextColor,
-              onCardTapped: () => _showCalendarBottomSheet(index), // <-- AGORA ABRE O CALENDÁRIO DIRETAMENTE
-              onChatTapped: () { 
-                Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorChatScreen(
-                  patientName: appt['patientName'],
-                  patientInitials: appt['initials'], initialMessages: [],
-                )));
-              }
-            );
-          }),
-
-          // Slot Livre
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isHighContrast ? Colors.transparent : Colors.white.withOpacity(0.02),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, style: BorderStyle.solid),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 70,
-                  child: Text('2:30 PM', style: TextStyle(color: subTextColor, fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  ],
                 ),
-                Container(width: 2, height: 30, color: borderColor, margin: const EdgeInsets.symmetric(horizontal: 12)),
-                Text('Slot Livre', style: TextStyle(color: subTextColor, fontStyle: FontStyle.italic)),
-              ],
-            ),
-          ),
-        ],
+              ),
+              const SizedBox(height: 32),
+
+              // --- CALENDÁRIO DE PACIENTES ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Consultas de Hoje', style: TextStyle(color: mainTextColor, fontSize: 18, fontWeight: FontWeight.bold)),
+                  Icon(Icons.calendar_month, color: subTextColor, size: 20),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Constrói os cartões dinamicamente com base nos dados do Firestore
+              if (docs.isEmpty)
+                Text('Sem consultas agendadas.', style: TextStyle(color: subTextColor))
+              else
+                ...docs.map((doc) {
+                  final appt = doc.data() as Map<String, dynamic>;
+                  final docId = doc.id;
+
+                  // Cores dinâmicas convertidas de Hex string/int se necessário
+                  Color statusColor = const Color(0xFF2DD4BF);
+                  if (appt['initials'] == 'MS') statusColor = const Color(0xFFE81CFF);
+
+                  return _buildPatientSlot(
+                    time: appt['time'] ?? '9:30 AM',
+                    patientName: appt['patientName'] ?? 'Paciente',
+                    type: appt['type'] ?? 'Consulta',
+                    statusColor: statusColor,
+                    isCompleted: appt['isCompleted'] ?? false,
+                    cardColor: cardColor,
+                    borderColor: borderColor,
+                    mainTextColor: mainTextColor,
+                    subTextColor: subTextColor,
+                    onCardTapped: () => _showCalendarBottomSheet(docId, appt), 
+                    onChatTapped: () { 
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorChatScreen(
+                        patientName: appt['patientName'] ?? 'Paciente',
+                        patientInitials: appt['initials'] ?? 'P', initialMessages: [],
+                      )));
+                    }
+                  );
+                }),
+
+              const SizedBox(height: 12),
+              // Slot Livre
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isHighContrast ? Colors.transparent : Colors.white.withOpacity(0.02),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderColor, style: BorderStyle.solid),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 70,
+                      child: Text('2:30 PM', style: TextStyle(color: subTextColor, fontWeight: FontWeight.bold)),
+                    ),
+                    Container(width: 2, height: 30, color: borderColor, margin: const EdgeInsets.symmetric(horizontal: 12)),
+                    Text('Slot Livre', style: TextStyle(color: subTextColor, fontStyle: FontStyle.italic)),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
