@@ -332,6 +332,9 @@ class _LoginScreenState extends State<LoginScreen> {
               onTap: () {
                 Navigator.pop(ctx); 
                 isLoggedIn = true;
+                currentUserId = 'paciente_joao'; 
+                currentUserName = 'Afonso Soeiro';
+                saveData(); // Grava
                 Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator()));
               },
             ),
@@ -367,21 +370,69 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // --- NOVA LÓGICA DE LOGIN COM RBAC E GRAVAÇÃO DE IDENTIDADE ---
   void _handleLogin() {
-    FocusScope.of(context).unfocus(); // Fecha o teclado com segurança
+    FocusScope.of(context).unfocus(); 
     HapticFeedback.lightImpact();
-    isLoggedIn = true; 
     
-    if (_emailController.text == 'admin' && _passwordController.text == '1234') {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DoctorDashboard()));
+    String email = _emailController.text.trim().toLowerCase();
+    String password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, preenche o email e a password.')),
+      );
+      return;
+    }
+
+    // --- LIGAÇÃO MÉDICA ---
+    if ((email == 'joana@smartglyco.pt' || email == 'medica') && password == '1234') {
+      isLoggedIn = true; 
+      currentUserId = 'medica_joana';
+      currentUserName = 'Dra. Joana Silvia';
+      saveData(); // <--- Grava na memória do telemóvel
+      
+      debugPrint("👩‍⚕️ LOGIN EFETUADO: Dra. Joana Silvia");
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DoctorDashboard())
+      );
+
+    // --- LIGAÇÃO PACIENTE 1 (JOÃO) ---
+    } else if ((email == 'joao@smartglyco.pt' || email == 'joao') && password == '1234') {
+      isLoggedIn = true; 
+      currentUserId = 'paciente_joao';
+      currentUserName = 'João Antunes';
+      saveData(); 
+      
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainNavigator())
+      );
+
+    // --- LIGAÇÃO PACIENTE 2 (MARIA) ---
+    } else if ((email == 'maria@smartglyco.pt' || email == 'maria') && password == '1234') {
+      isLoggedIn = true; 
+      currentUserId = 'paciente_maria'; // ID DIFERENTE! Vai para a sala dela.
+      currentUserName = 'Maria Silva';
+      saveData(); 
+      
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainNavigator())
+      );
+
+    // --- SE FALHAR O EMAIL OU A PASS ---
     } else {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator()));
+      isLoggedIn = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFF43F5E),
+          content: Text('Credenciais incorretas! Tenta joao@ ou joana@ com a pass 1234'),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // GESTURE DETECTOR NA RAIZ PARA FECHAR O TECLADO AO CLICAR FORA
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.opaque,
@@ -414,10 +465,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 // --- CAMPO EMAIL COM FOCO EXPLÍCITO ---
                 TextField(
                   controller: _emailController,
-                  focusNode: _emailFocus, // LIGAÇÃO DO FOCO
+                  focusNode: _emailFocus, 
                   keyboardType: TextInputType.emailAddress, 
                   textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _passFocus.requestFocus(), // Passa pro próximo sozinho ao dar Enter
+                  onSubmitted: (_) => _passFocus.requestFocus(), 
                   style: const TextStyle(color: Colors.white),
                   decoration: _customInputDeco('Email', Icons.mail_outline)
                 ), 
@@ -426,7 +477,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // --- CAMPO PASSWORD COM FOCO EXPLÍCITO ---
                 TextField(
                   controller: _passwordController,
-                  focusNode: _passFocus, // LIGAÇÃO DO FOCO
+                  focusNode: _passFocus, 
                   obscureText: true,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _handleLogin(), 
@@ -578,6 +629,9 @@ class SignUpScreen extends StatelessWidget {
                   onTap: () {
                     HapticFeedback.lightImpact();
                     isLoggedIn = true; 
+                    currentUserId = 'paciente_joao'; // Valor por defeito ao registar no protótipo
+                    currentUserName = 'Novo Utilizador';
+                    saveData();
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const MainNavigator()), 
                       (Route<dynamic> route) => false

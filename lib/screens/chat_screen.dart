@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../app_data.dart'; // Importante para aceder ao isHighContrast
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../app_data.dart'; 
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -12,49 +13,38 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  var _messages = [
-    {
-      'text': 'Olá João! Analisei os teus dados da última semana. A tua glicose parece estável. Continua o excelente trabalho!',
-      'isMe': false,
-      'time': '09:12',
-    },
-    {
-      'text': 'Muito obrigado! Tenho uma dúvida sobre a minha dose de insulina de manhã...',
-      'isMe': true,
-      'time': '09:20',
-    },
-    {
-      'text': 'Claro! Terei todo o gosto em ajudar. Qual é a tua dose atual e como têm sido as leituras em jejum?',
-      'isMe': false,
-      'time': '09:24',
-    },
-  ];
+  // --- FIREBASE 1: Escutar apenas a sala privada deste paciente ---
+  Stream<QuerySnapshot> get _chatStream => FirebaseFirestore.instance
+      .collection('chat_$currentUserId') // Ex: 'chat_paciente_joao'
+      .orderBy('timestamp', descending: false)
+      .snapshots();
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-
-    setState(() {
-      _messages.add({
-        'text': _messageController.text.trim(),
-        'isMe': true,
-        'time': '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-      });
-    });
+  void _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
 
     _messageController.clear();
-    
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+
+    // --- FIREBASE 2: Enviar mensagem para a sala privada ---
+    await FirebaseFirestore.instance.collection('chat_$currentUserId').add({
+      'text': text,
+      'senderId': currentUserId, 
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- LÓGICA DE ALTO CONTRASTE ---
     final bgColor = isHighContrast ? Colors.black : const Color(0xFF090C10);
     final cardColor = isHighContrast ? Colors.black : const Color(0xFF141923);
     final docBubbleColor = isHighContrast ? Colors.black : const Color(0xFF1A2130);
@@ -88,20 +78,55 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           _buildDoctorHeader(cardColor, mainTextColor, subTextColor, borderColor),
+          
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                final isMe = message['isMe'] == true; 
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _chatStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF3B82F6)));
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text('Erro ao carregar mensagens.', style: TextStyle(color: mainTextColor)));
+                }
+
+                final docs = snapshot.data?.docs ?? [];
                 
-                return _buildMessageBubble(
-                  text: message['text'].toString(),
-                  time: message['time'].toString(),
-                  isMe: isMe,
-                  docBubbleColor: docBubbleColor,
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Text('Nenhuma mensagem ainda.\nDiz olá à Dra. Joana!', 
+                      textAlign: TextAlign.center, 
+                      style: TextStyle(color: subTextColor)
+                    )
+                  );
+                }
+
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    
+                    final String messageText = data['text'] ?? '';
+                    final String senderId = data['senderId'] ?? '';
+                    final bool isMe = senderId == currentUserId;
+
+                    String timeString = '';
+                    if (data['timestamp'] != null) {
+                      final timestamp = data['timestamp'] as Timestamp;
+                      final date = timestamp.toDate();
+                      timeString = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+                    }
+
+                    return _buildMessageBubble(
+                      text: messageText,
+                      time: timeString,
+                      isMe: isMe,
+                      docBubbleColor: docBubbleColor,
+                    );
+                  },
                 );
               },
             ),

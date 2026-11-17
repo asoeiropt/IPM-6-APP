@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../app_data.dart'; 
 
 class DoctorChatScreen extends StatefulWidget {
   final String patientName;
   final String patientInitials;
-  final List initialMessages;
-
+  
   const DoctorChatScreen({
     super.key,
     required this.patientName,
-    required this.patientInitials,
-    required this.initialMessages,
+    required this.patientInitials, required List<Map<String, Object>> initialMessages,
   });
 
   @override
@@ -21,77 +20,42 @@ class DoctorChatScreen extends StatefulWidget {
 class _DoctorChatScreenState extends State<DoctorChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isTyping = false;
-  List _messages = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _messages = List.from(widget.initialMessages);
+  // --- FIREBASE 1: Apanhar a sala consoante o doente escolhido ---
+  Stream<QuerySnapshot> _getChatStream() {
+    String roomId = widget.patientName.contains("João") 
+        ? 'chat_paciente_joao' 
+        : 'chat_paciente_maria';
+
+    return FirebaseFirestore.instance
+        .collection(roomId)
+        .orderBy('timestamp', descending: false)
+        .snapshots();
   }
 
-  // OBRIGA O ECRÃ A ATUALIZAR SE O PACIENTE MUDAR!
-  @override
-  void didUpdateWidget(covariant DoctorChatScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.patientName != oldWidget.patientName) {
-      _messages = List.from(widget.initialMessages);
-    }
-  }
-
-  void _sendMessage() {
+  void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
     HapticFeedback.lightImpact();
-    
-    setState(() {
-      _messages.add({
-        'text': text,
-        'isMe': true,
-        'time': _getCurrentTime(),
-      });
-      _messageController.clear();
+    _messageController.clear();
+
+    String roomId = widget.patientName.contains("João") 
+        ? 'chat_paciente_joao' 
+        : 'chat_paciente_maria';
+
+    // --- FIREBASE 2: Enviar mensagem para a sala isolada ---
+    await FirebaseFirestore.instance.collection(roomId).add({
+      'text': text,
+      'senderId': currentUserId, // A Dra. Joana
+      'timestamp': FieldValue.serverTimestamp(),
     });
 
     _scrollToBottom();
-    
-    // Simulações diferentes consoante o paciente
-    if (widget.patientName.contains("João")) {
-      _simulatePatientReply('Já bebi o sumo de 15g Dra. Joana. Estou a aguardar os 15 minutos sentindo-me um pouco melhor. Obrigado pela rapidez!');
-    } else if (widget.patientName.contains("Maria")) {
-      _simulatePatientReply('Muito obrigada Dra. Joana, não me esqueço!');
-    }
-  }
-
-  void _simulatePatientReply(String replyText) async {
-    setState(() => _isTyping = true);
-    _scrollToBottom();
-
-    await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
-
-    setState(() {
-      _isTyping = false;
-      _messages.add({
-        'text': replyText,
-        'isMe': false,
-        'time': _getCurrentTime(),
-      });
-    });
-
-    HapticFeedback.mediumImpact(); 
-    _scrollToBottom();
-  }
-
-  String _getCurrentTime() {
-    final now = DateTime.now();
-    int hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
-    return '$hour:${now.minute.toString().padLeft(2, '0')}${now.hour >= 12 ? 'PM' : 'AM'}';
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future.delayed(const Duration(milliseconds: 300), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent + 100, 
@@ -163,15 +127,52 @@ class _DoctorChatScreenState extends State<DoctorChatScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // --- FIREBASE 3: Ligar a UI ao Stream privado ---
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length + (_isTyping ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == _messages.length && _isTyping) return _buildTypingIndicator(avatarColor);
-                  final msg = _messages[index];
-                  return _buildMessageBubble(msg['text'], msg['time'], msg['isMe']);
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _getChatStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFF3B82F6)));
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Erro ao carregar chat.', style: TextStyle(color: mainTextColor)));
+                  }
+
+                  final docs = snapshot.data?.docs ?? [];
+                  
+                  if (docs.isEmpty) {
+                    return Center(
+                      child: Text('A aguardar mensagens do paciente.', 
+                        style: TextStyle(color: subTextColor)
+                      )
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      
+                      final String messageText = data['text'] ?? '';
+                      final String senderId = data['senderId'] ?? '';
+                      
+                      final bool isMe = senderId == currentUserId;
+
+                      String timeString = '';
+                      if (data['timestamp'] != null) {
+                        final timestamp = data['timestamp'] as Timestamp;
+                        final date = timestamp.toDate();
+                        int hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+                        timeString = '$hour:${date.minute.toString().padLeft(2, '0')}${date.hour >= 12 ? 'PM' : 'AM'}';
+                      }
+
+                      return _buildMessageBubble(messageText, timeString, isMe, isSOS);
+                    },
+                  );
                 },
               ),
             ),
@@ -229,13 +230,14 @@ class _DoctorChatScreenState extends State<DoctorChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(String text, String time, bool isMe) {
+  Widget _buildMessageBubble(String text, String time, bool isMe, bool isSOS) {
     final bubbleColor = isHighContrast 
         ? (isMe ? const Color(0xFFFFD600) : Colors.transparent)
         : (isMe ? const Color(0xFF3B82F6) : const Color(0xFF1E293B));
         
     final textColor = isHighContrast ? (isMe ? Colors.black : Colors.white) : Colors.white;
-    final isSOSMsg = !isMe && text.contains('SOS');
+    final isSOSMsg = !isMe && text.contains('SOS') && isSOS; 
+    
     final border = isHighContrast && !isMe 
         ? Border.all(color: const Color(0xFFFFD600), width: 1.5) 
         : (isSOSMsg ? Border.all(color: Colors.redAccent, width: 1) : null);
@@ -287,32 +289,6 @@ class _DoctorChatScreenState extends State<DoctorChatScreen> {
             ),
           ),
           if (isMe) const SizedBox(width: 22), 
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTypingIndicator(Color avatarColor) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: isHighContrast ? Colors.transparent : avatarColor.withOpacity(0.2),
-            child: Text(widget.patientInitials, style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : avatarColor, fontSize: 10, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isHighContrast ? Colors.transparent : const Color(0xFF1E293B),
-              border: isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 1.5) : null,
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20), bottomLeft: Radius.circular(4), bottomRight: Radius.circular(20)),
-            ),
-            child: Text('A escrever...', style: TextStyle(color: isHighContrast ? const Color(0xFFFFD600) : Colors.white70, fontSize: 13, fontStyle: FontStyle.italic)),
-          ),
         ],
       ),
     );

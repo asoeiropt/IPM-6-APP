@@ -23,7 +23,7 @@ class _MainNavigatorState extends State<MainNavigator> {
   Widget get _currentScreen => [
     const HomeTab(), 
     const DiaryTab(), 
-    const CareTab(), 
+    CareTab(), 
     const ProfileTab()
   ][_currentIndex];
 

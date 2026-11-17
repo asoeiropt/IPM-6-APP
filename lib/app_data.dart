@@ -27,6 +27,10 @@ bool askedForNotifications = false;
 bool useBiometricsGlobal = false; 
 bool isHighContrast = false; // <-- NOVA VARIÁVEL DE ACESSIBILIDADE
 
+// --- VARIÁVEIS DE IDENTIDADE (FIREBASE CHAT) ---
+String currentUserId = '';
+String currentUserName = '';
+
 // ==========================================
 // MOTOR DE NOTIFICAÇÕES ACIONÁVEIS (IPM)
 // ==========================================
@@ -147,6 +151,10 @@ Future<void> loadData() async {
   useBiometricsGlobal = prefs.getBool('useBiometrics') ?? false; 
   isHighContrast = prefs.getBool('isHighContrast') ?? false; 
 
+  // CARREGA A IDENTIDADE GRAVADA
+  currentUserId = prefs.getString('currentUserId') ?? '';
+  currentUserName = prefs.getString('currentUserName') ?? '';
+
   final String? diaryString = prefs.getString('diary');
   if (diaryString != null) {
     globalDiary = (jsonDecode(diaryString) as List).map((e) => Map<String, dynamic>.from(e)).toList();
@@ -184,6 +192,10 @@ Future<void> saveData() async {
   await prefs.setBool('askedForNotifications', askedForNotifications);
   await prefs.setBool('useBiometrics', useBiometricsGlobal); 
   await prefs.setBool('isHighContrast', isHighContrast); 
+  
+  // GRAVA A IDENTIDADE NO TELEMÓVEL
+  await prefs.setString('currentUserId', currentUserId);
+  await prefs.setString('currentUserName', currentUserName);
   
   await prefs.setString('diary', jsonEncode(globalDiary));
   await prefs.setString('glucose', jsonEncode(globalGlucose)); 
