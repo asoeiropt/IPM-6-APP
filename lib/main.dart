@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_core/firebase_core.dart'; // <-- Import do Firebase
 import 'startup_screens.dart'; 
 
 @pragma('vm:entry-point')
@@ -18,7 +19,7 @@ void callbackDispatcher() {
         
         FlutterLocalNotificationsPlugin flip = FlutterLocalNotificationsPlugin();
         
-        var android = const AndroidInitializationSettings('@mipmap/ic_launcher'); // Corrigido para o ícone padrão do Flutter (ou usa o teu se tiveres um custom)
+        var android = const AndroidInitializationSettings('@mipmap/ic_launcher');
         var settings = InitializationSettings(android: android);
         
         await flip.initialize(settings);
@@ -35,7 +36,7 @@ void callbackDispatcher() {
             AndroidNotificationAction(
               'action_juice', 
               '🧃 Registar 15g Sumo', 
-              showsUserInterface: true, // Abre a app ou executa a ação visualmente
+              showsUserInterface: true, 
             ),
           ],
         );
@@ -55,6 +56,20 @@ void callbackDispatcher() {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // <-- LIGAÇÃO AO FIREBASE COM AS TUAS CHAVES
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyDsnKprN107vKBUOFIDcILMI_Pd7NGjTJ0",
+      authDomain: "smartglycoai.firebaseapp.com",
+      projectId: "smartglycoai",
+      storageBucket: "smartglycoai.firebasestorage.app",
+      messagingSenderId: "358595848241",
+      appId: "1:358595848241:web:40a050e8b4ab48f1204d10",
+    ),
+  );
+
+  debugPrint("✅ FIREBASE LIGADO COM SUCESSO! A base de dados está pronta.");
 
   await Workmanager().initialize(
     callbackDispatcher,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_data.dart'; 
 import 'main_navigator.dart';
+import 'screens/doctor_dashboard.dart'; // <--- IMPORTAÇÃO DO PORTAL DO MÉDICO
 
 // --- CORES BASE DO NOVO DESIGN ---
 const Color bgColor = Color(0xFF090C10);
@@ -269,9 +270,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-// --- ECRÃ DE LOGIN ---
-class LoginScreen extends StatelessWidget {
+// --- ECRÃ DE LOGIN (COM RBAC E FIX DO TECLADO À PROVA DE BALA) ---
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  
+  // CONTROLADORES DE FOCO (Para obrigar o teclado a abrir!)
+  final FocusNode _emailFocus = FocusNode();
+  final FocusNode _passFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _emailFocus.dispose();
+    _passFocus.dispose();
+    super.dispose();
+  }
 
   void _showMockGoogleSignIn(BuildContext context) {
     showModalBottomSheet(
@@ -345,110 +367,134 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
+  void _handleLogin() {
+    FocusScope.of(context).unfocus(); // Fecha o teclado com segurança
+    HapticFeedback.lightImpact();
+    isLoggedIn = true; 
+    
+    if (_emailController.text == 'admin' && _passwordController.text == '1234') {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DoctorDashboard()));
+    } else {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0), 
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.center,
-                child: Container(
-                  width: 100, height: 100,
-                  decoration: BoxDecoration(
-                    color: cardColor, 
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
-                  ),
-                  child: const Icon(Icons.monitor_heart, size: 40, color: Color(0xFF3B82F6)),
-                ),
-              ),
-              const SizedBox(height: 32), 
-              
-              const Text('Welcome Back', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 40), 
-              
-              TextField(
-                style: const TextStyle(color: Colors.white),
-                decoration: _customInputDeco('Email', Icons.mail_outline)
-              ), 
-              const SizedBox(height: 16), 
-              TextField(
-                obscureText: true,
-                style: const TextStyle(color: Colors.white),
-                decoration: _customInputDeco('Password', Icons.lock_outline)
-              ), 
-              const SizedBox(height: 32), 
-              
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  isLoggedIn = true; 
-                  Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator()));
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    gradient: neonGradient,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+    // GESTURE DETECTOR NA RAIZ PARA FECHAR O TECLADO AO CLICAR FORA
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0), 
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 100, height: 100,
+                    decoration: BoxDecoration(
+                      color: cardColor, 
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: const Icon(Icons.monitor_heart, size: 40, color: Color(0xFF3B82F6)),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16), 
-              
-              GestureDetector(
-                onTap: () => _showMockGoogleSignIn(context),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Sign in with Google', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                    ],
+                const SizedBox(height: 32), 
+                
+                const Text('Welcome Back', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 40), 
+                
+                // --- CAMPO EMAIL COM FOCO EXPLÍCITO ---
+                TextField(
+                  controller: _emailController,
+                  focusNode: _emailFocus, // LIGAÇÃO DO FOCO
+                  keyboardType: TextInputType.emailAddress, 
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _passFocus.requestFocus(), // Passa pro próximo sozinho ao dar Enter
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _customInputDeco('Email', Icons.mail_outline)
+                ), 
+                const SizedBox(height: 16), 
+                
+                // --- CAMPO PASSWORD COM FOCO EXPLÍCITO ---
+                TextField(
+                  controller: _passwordController,
+                  focusNode: _passFocus, // LIGAÇÃO DO FOCO
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _handleLogin(), 
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _customInputDeco('Password', Icons.lock_outline)
+                ), 
+                const SizedBox(height: 32), 
+                
+                GestureDetector(
+                  onTap: _handleLogin, 
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: neonGradient,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
                   ),
                 ),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // --- ZONA DE CRIAR CONTA ---
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Don't have an account? ", style: TextStyle(color: textMuted, fontSize: 14)),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignUpScreen()));
-                    },
-                    child: const Text('Sign Up', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16), 
+                
+                GestureDetector(
+                  onTap: () => _showMockGoogleSignIn(context),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('Sign in with Google', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ]
+                ),
+                
+                const SizedBox(height: 32),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Don't have an account? ", style: TextStyle(color: textMuted, fontSize: 14)),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignUpScreen()));
+                      },
+                      child: const Text('Sign Up', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ]
+            )
           )
-        )
-      )
+        ),
+      ),
     );
   }
 }
@@ -473,121 +519,128 @@ class SignUpScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-        onPressed: () => Navigator.pop(context), // <--- Substitui onTap por onPressed
-          ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 10.0), 
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Create Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 8),
-              const Text('Join SmartGlycoAI today', style: TextStyle(color: textMuted, fontSize: 14)),
-              const SizedBox(height: 40), 
-              
-              TextField(
-                style: const TextStyle(color: Colors.white),
-                decoration: _customInputDeco('Full Name', Icons.person_outline)
-              ), 
-              const SizedBox(height: 16), 
-              
-              TextField(
-                style: const TextStyle(color: Colors.white),
-                decoration: _customInputDeco('Email', Icons.mail_outline)
-              ), 
-              const SizedBox(height: 16), 
-              
-              TextField(
-                obscureText: true,
-                style: const TextStyle(color: Colors.white),
-                decoration: _customInputDeco('Password', Icons.lock_outline)
-              ), 
-              const SizedBox(height: 16),
-              
-              TextField(
-                obscureText: true,
-                style: const TextStyle(color: Colors.white),
-                decoration: _customInputDeco('Confirm Password', Icons.lock_outline)
-              ), 
-              const SizedBox(height: 32), 
-              
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  isLoggedIn = true; 
-                  // Vai direto para a App após criar conta e remove o stack de navegação para trás
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const MainNavigator()), 
-                    (Route<dynamic> route) => false
-                  );
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    gradient: neonGradient,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text('Create Account', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16), 
-              
-              GestureDetector(
-                onTap: () {
-                  // Pode chamar o mesmo mock de Google Sign In aqui ou voltar atrás
-                  Navigator.pop(context); 
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Sign up with Google', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                    ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: bgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context), 
+            ),
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 10.0), 
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Create Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 8),
+                const Text('Join SmartGlycoAI today', style: TextStyle(color: textMuted, fontSize: 14)),
+                const SizedBox(height: 40), 
+                
+                TextField(
+                  style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.next,
+                  decoration: _customInputDeco('Full Name', Icons.person_outline)
+                ), 
+                const SizedBox(height: 16), 
+                
+                TextField(
+                  style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _customInputDeco('Email', Icons.mail_outline)
+                ), 
+                const SizedBox(height: 16), 
+                
+                TextField(
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.next,
+                  decoration: _customInputDeco('Password', Icons.lock_outline)
+                ), 
+                const SizedBox(height: 16),
+                
+                TextField(
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.done,
+                  decoration: _customInputDeco('Confirm Password', Icons.lock_outline)
+                ), 
+                const SizedBox(height: 32), 
+                
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    isLoggedIn = true; 
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const MainNavigator()), 
+                      (Route<dynamic> route) => false
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: neonGradient,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text('Create Account', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
                   ),
                 ),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Already have an account? ", style: TextStyle(color: textMuted, fontSize: 14)),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pop(context); // Volta ao login
-                    },
-                    child: const Text('Sign In', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16), 
+                
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context); 
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('Sign up with Google', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ]
+                ),
+                
+                const SizedBox(height: 32),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Already have an account? ", style: TextStyle(color: textMuted, fontSize: 14)),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pop(context); 
+                      },
+                      child: const Text('Sign In', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ]
+            )
           )
         )
       )
