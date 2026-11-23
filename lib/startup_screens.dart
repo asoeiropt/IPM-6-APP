@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'app_data.dart'; 
+import 'app_data.dart';
+import 'fcm_notification_service.dart';
 import 'main_navigator.dart';
-import 'screens/doctor_dashboard.dart'; // <--- IMPORTAÇÃO DO PORTAL DO MÉDICO
+import 'screens/doctor_dashboard.dart';
 
-// --- CORES BASE DO NOVO DESIGN ---
 const Color bgColor = Color(0xFF090C10);
 const Color cardColor = Color(0xFF141923);
 const Gradient neonGradient = LinearGradient(
-  colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)], 
+  colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
 );
 const Gradient dangerGradient = LinearGradient(
-  colors: [Color(0xFFF43F5E), Color(0xFFBE185D)], 
+  colors: [Color(0xFFF43F5E), Color(0xFFBE185D)],
 );
 const Color textMuted = Color(0xFF64748B);
 
-// --- ECRÃ DE INÍCIO (SPLASH SCREEN) ---
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -30,9 +29,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startAppEngines() async {
-    await Future.delayed(const Duration(seconds: 10)); 
+    await Future.delayed(const Duration(seconds: 10));
     if (mounted) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()));
     }
   }
 
@@ -45,27 +45,29 @@ class _SplashScreenState extends State<SplashScreen> {
         height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/splash_logo.jpg'), 
-            fit: BoxFit.cover, 
+            image: AssetImage('assets/splash_logo.jpg'),
+            fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.end, 
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 48.0),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5), 
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 20, spreadRadius: 5),
-                    ]
-                  ),
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                            color: const Color(0xFF3B82F6).withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5),
+                      ]),
                   child: const CircularProgressIndicator(
-                    color: Colors.white, 
+                    color: Colors.white,
                     strokeWidth: 3,
                   ),
                 ),
@@ -78,7 +80,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-// --- ECRÃ DE BLOQUEIO (BIOMETRIA) ---
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
   @override
@@ -87,79 +88,98 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   @override
-  void initState() { 
-    super.initState(); 
+  void initState() {
+    super.initState();
     _authenticate();
   }
 
   Future<void> _authenticate() async {
     bool authenticated = false;
-    try { 
-      authenticated = await biometricAuth.authenticate(localizedReason: 'Please authenticate to access your health data.'); 
-    } catch (e) { 
+    try {
+      authenticated = await biometricAuth.authenticate(
+          localizedReason: 'Please authenticate to access your health data.');
+    } catch (e) {
       debugPrint("Biometric Error: $e");
     }
-    
-    if (authenticated && mounted) { 
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator())); 
+
+    if (authenticated && mounted) {
+      FcmNotificationService.instance
+          .registerUserDeviceToken()
+          .catchError((e) => debugPrint("FCM Error: $e"));
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => currentUserId == 'medica_joana'
+              ? const DoctorDashboard()
+              : const MainNavigator(),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, 
-          children: [
-            Container(
-              width: 130, height: 130,
-              decoration: BoxDecoration(
-                color: cardColor, 
+        backgroundColor: bgColor,
+        body: Center(
+            child:
+                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+                color: cardColor,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white.withOpacity(0.05)),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFFF43F5E).withOpacity(0.1), blurRadius: 30),
-                ]
+                  BoxShadow(
+                      color: const Color(0xFFF43F5E).withOpacity(0.1),
+                      blurRadius: 30),
+                ]),
+            child: const Icon(Icons.lock_outline,
+                size: 50, color: Color(0xFFF43F5E)),
+          ),
+          const SizedBox(height: 32),
+          const Text('App Locked',
+              style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
+          const SizedBox(height: 8),
+          const Text('Biometric protection enabled.',
+              style: TextStyle(color: textMuted, fontSize: 14)),
+          const SizedBox(height: 40),
+          GestureDetector(
+            onTap: _authenticate,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: dangerGradient,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                      color: const Color(0xFFF43F5E).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4)),
+                ],
               ),
-              child: const Icon(Icons.lock_outline, size: 50, color: Color(0xFFF43F5E)),
-            ),
-            const SizedBox(height: 32), 
-            const Text('App Locked', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 8), 
-            const Text('Biometric protection enabled.', style: TextStyle(color: textMuted, fontSize: 14)),
-            const SizedBox(height: 40), 
-            
-            GestureDetector(
-              onTap: _authenticate,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: dangerGradient,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFFF43F5E).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.fingerprint, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('Try Again', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  ],
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.fingerprint, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Try Again',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
-          ]
-        )
-      )
-    );
+          ),
+        ])));
   }
 }
 
-// --- ECRÃ DE BOAS VINDAS (ONBOARDING) ---
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
   @override
@@ -173,104 +193,120 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
+        backgroundColor: bgColor,
+        body: SafeArea(
+            child: Column(children: [
+          Expanded(
               child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) => setState(() => _currentPage = i),
-                children: [
-                  _buildPage(Icons.health_and_safety, 'Welcome to\nSmartGlycoAI', 'Your smart assistant for diabetes\nmanagement.'),
-                  _buildPage(Icons.camera_alt_outlined, 'AI Calculation', 'Take a picture of your meal and our AI will\nsuggest the exact insulin dose.'),
-                  _buildPage(Icons.notifications_active_outlined, 'Crisis Prevention', 'Predictive warnings before a hypoglycemia\noccurs.')
-                ]
-              )
-            ), 
-            Padding(
-              padding: const EdgeInsets.all(32.0), 
+                  controller: _pageController,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  children: [
+                _buildPage(Icons.health_and_safety, 'Welcome to\nSmartGlycoAI',
+                    'Your smart assistant for diabetes\nmanagement.'),
+                _buildPage(Icons.camera_alt_outlined, 'AI Calculation',
+                    'Take a picture of your meal and our AI will\nsuggest the exact insulin dose.'),
+                _buildPage(
+                    Icons.notifications_active_outlined,
+                    'Crisis Prevention',
+                    'Predictive warnings before a hypoglycemia\noccurs.')
+              ])),
+          Padding(
+              padding: const EdgeInsets.all(32.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: List.generate(3, (index) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.only(right: 8), 
-                      height: 8, 
-                      width: _currentPage == index ? 24 : 8, 
-                      decoration: BoxDecoration(
-                        color: _currentPage == index ? const Color(0xFF3B82F6) : cardColor,
-                        borderRadius: BorderRadius.circular(8)
-                      )
-                    ))
-                  ), 
-                  GestureDetector(
-                    onTap: () { 
-                      HapticFeedback.lightImpact();
-                      if (_currentPage == 2) { 
-                        isFirstTime = false;
-                        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
-                      } else { 
-                        _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn); 
-                      } 
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      decoration: BoxDecoration(
-                        gradient: neonGradient,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
-                        ],
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                        children: List.generate(
+                            3,
+                            (index) => AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                margin: const EdgeInsets.only(right: 8),
+                                height: 8,
+                                width: _currentPage == index ? 24 : 8,
+                                decoration: BoxDecoration(
+                                    color: _currentPage == index
+                                        ? const Color(0xFF3B82F6)
+                                        : cardColor,
+                                    borderRadius: BorderRadius.circular(8))))),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        if (_currentPage == 2) {
+                          isFirstTime = false;
+                          Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginScreen()));
+                        } else {
+                          _pageController.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeIn);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: neonGradient,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                                color: const Color(0xFF3B82F6).withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4)),
+                          ],
+                        ),
+                        child: Text(_currentPage == 2 ? 'Start' : 'Next',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
                       ),
-                      child: Text(
-                        _currentPage == 2 ? 'Start' : 'Next',
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
-                      ),
-                    ),
-                  )
-                ]
-              )
-            )
-          ]
-        )
-      )
-    );
+                    )
+                  ]))
+        ])));
   }
 
-  Widget _buildPage(IconData icon, String title, String desc) { 
+  Widget _buildPage(IconData icon, String title, String desc) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40.0), 
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center, 
-        children: [
+        padding: const EdgeInsets.symmetric(horizontal: 40.0),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Container(
             padding: const EdgeInsets.all(36),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [const Color(0xFF3B82F6).withOpacity(0.2), Colors.transparent],
+                colors: [
+                  const Color(0xFF3B82F6).withOpacity(0.2),
+                  Colors.transparent
+                ],
                 radius: 0.8,
               ),
             ),
             child: Container(
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: cardColor, shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.05))),
+              decoration: BoxDecoration(
+                  color: cardColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.05))),
               child: Icon(icon, size: 50, color: const Color(0xFF3B82F6)),
             ),
           ),
-          const SizedBox(height: 48), 
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16), 
-          Text(desc, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: textMuted, height: 1.5))
-        ]
-      )
-    ); 
+          const SizedBox(height: 48),
+          Text(title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
+          const SizedBox(height: 16),
+          Text(desc,
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(fontSize: 15, color: textMuted, height: 1.5))
+        ]));
   }
 }
 
-// --- ECRÃ DE LOGIN (COM RBAC E FIX DO TECLADO À PROVA DE BALA) ---
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -281,8 +317,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
-  // CONTROLADORES DE FOCO (Para obrigar o teclado a abrir!)
+
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _passFocus = FocusNode();
 
@@ -297,63 +332,81 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showMockGoogleSignIn(BuildContext context) {
     showModalBottomSheet(
-      context: context,
-      backgroundColor: cardColor, 
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.g_mobiledata, size: 40, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Sign in with Google', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text('Choose an account to continue to SmartGlycoAI', style: TextStyle(color: textMuted, fontSize: 14)),
-            const SizedBox(height: 24),
-            
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  gradient: neonGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-              title: const Text('Afonso Soeiro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              subtitle: const Text('afonso.soeiro@gmail.com', style: TextStyle(color: textMuted)),
-              onTap: () {
-                Navigator.pop(ctx); 
-                isLoggedIn = true;
-                currentUserId = 'paciente_joao'; 
-                currentUserName = 'Afonso Soeiro';
-                saveData(); // Grava
-                Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainNavigator()));
-              },
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle),
-                child: const Icon(Icons.person_add, color: Colors.white54, size: 20),
-              ),
-              title: const Text('Add another account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-              onTap: () => Navigator.pop(ctx), 
-            ),
-            const SizedBox(height: 32),
-          ]
-        )
-      )
-    );
+        context: context,
+        backgroundColor: cardColor,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (ctx) => Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.g_mobiledata, size: 40, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('Sign in with Google',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Choose an account to continue to SmartGlycoAI',
+                      style: TextStyle(color: textMuted, fontSize: 14)),
+                  const SizedBox(height: 24),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        gradient: neonGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text('A',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16)),
+                    ),
+                    title: const Text('Afonso Soeiro',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('afonso.soeiro@gmail.com',
+                        style: TextStyle(color: textMuted)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      isLoggedIn = true;
+                      currentUserId = 'paciente_joao';
+                      currentUserName = 'Afonso Soeiro';
+                      saveData();
+                      FcmNotificationService.instance
+                          .registerUserDeviceToken()
+                          .catchError((e) => debugPrint("FCM Error: $e"));
+                      Navigator.of(context).pushReplacement(MaterialPageRoute(
+                          builder: (_) => const MainNavigator()));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle),
+                      child: const Icon(Icons.person_add,
+                          color: Colors.white54, size: 20),
+                    ),
+                    title: const Text('Add another account',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w500)),
+                    onTap: () => Navigator.pop(ctx),
+                  ),
+                  const SizedBox(height: 32),
+                ])));
   }
 
   InputDecoration _customInputDeco(String hint, IconData icon) {
@@ -364,68 +417,90 @@ class _LoginScreenState extends State<LoginScreen> {
       filled: true,
       fillColor: cardColor,
       contentPadding: const EdgeInsets.symmetric(vertical: 20),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5)),
     );
   }
 
-  // --- NOVA LÓGICA DE LOGIN COM RBAC E GRAVAÇÃO DE IDENTIDADE ---
   void _handleLogin() {
-    FocusScope.of(context).unfocus(); 
+    FocusScope.of(context).unfocus();
     HapticFeedback.lightImpact();
-    
-    String email = _emailController.text.trim().toLowerCase();
-    String password = _passwordController.text;
+
+    final String email = _emailController.text.trim().toLowerCase();
+    final String password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preenche o email e a password.')),
+        const SnackBar(
+            content: Text('Por favor, preenche o email e a password.')),
       );
       return;
     }
 
-    // --- LIGAÇÃO MÉDICA ---
-    if ((email == 'joana@smartglyco.pt' || email == 'medica') && password == '1234') {
-      isLoggedIn = true; 
-      currentUserId = 'medica_joana';
-      currentUserName = 'Dra. Joana Silvia';
-      saveData(); // <--- Grava na memória do telemóvel
-      
-      debugPrint("👩‍⚕️ LOGIN EFETUADO: Dra. Joana Silvia");
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DoctorDashboard())
-      );
+    try {
+      // --- LIGAÇÃO MÉDICA ---
+      if ((email == 'joana@smartglyco.pt' || email == 'medica') &&
+          password == '1234') {
+        isLoggedIn = true;
+        currentUserId = 'medica_joana';
+        currentUserName = 'Dra. Joana Silvia';
+        saveData();
+        FcmNotificationService.instance
+            .registerUserDeviceToken()
+            .catchError((e) => debugPrint("FCM Error: $e"));
 
-    // --- LIGAÇÃO PACIENTE 1 (JOÃO) ---
-    } else if ((email == 'joao@smartglyco.pt' || email == 'joao') && password == '1234') {
-      isLoggedIn = true; 
-      currentUserId = 'paciente_joao';
-      currentUserName = 'João Antunes';
-      saveData(); 
-      
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigator())
-      );
+        debugPrint("👩‍⚕️ LOGIN EFETUADO: Dra. Joana Silvia");
+        Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const DoctorDashboard()));
 
-    // --- LIGAÇÃO PACIENTE 2 (MARIA) ---
-    } else if ((email == 'maria@smartglyco.pt' || email == 'maria') && password == '1234') {
-      isLoggedIn = true; 
-      currentUserId = 'paciente_maria'; // ID DIFERENTE! Vai para a sala dela.
-      currentUserName = 'Maria Silva';
-      saveData(); 
-      
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigator())
-      );
+        // --- LIGAÇÃO PACIENTE 1 (JOÃO) ---
+      } else if ((email == 'joao@smartglyco.pt' || email == 'joao') &&
+          password == '1234') {
+        isLoggedIn = true;
+        currentUserId = 'paciente_joao';
+        currentUserName = 'João Antunes';
+        saveData();
+        FcmNotificationService.instance
+            .registerUserDeviceToken()
+            .catchError((e) => debugPrint("FCM Error: $e"));
 
-    // --- SE FALHAR O EMAIL OU A PASS ---
-    } else {
-      isLoggedIn = false;
+        Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainNavigator()));
+
+        // --- LIGAÇÃO PACIENTE 2 (MARIA) ---
+      } else if ((email == 'maria@smartglyco.pt' || email == 'maria') &&
+          password == '1234') {
+        isLoggedIn = true;
+        currentUserId = 'paciente_maria';
+        currentUserName = 'Maria Silva';
+        saveData();
+        FcmNotificationService.instance
+            .registerUserDeviceToken()
+            .catchError((e) => debugPrint("FCM Error: $e"));
+
+        Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainNavigator()));
+      } else {
+        isLoggedIn = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFFF43F5E),
+            content: Text(
+                'Credenciais incorretas! Tenta joao@ ou joana@ com a pass 1234'),
+          ),
+        );
+      }
+    } catch (e, st) {
+      debugPrint("❌ ERRO NO LOGIN: $e\n$st");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFFF43F5E),
-          content: Text('Credenciais incorretas! Tenta joao@ ou joana@ com a pass 1234'),
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Erro ao entrar: $e'),
         ),
       );
     }
@@ -440,7 +515,8 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: bgColor,
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0), 
+            padding:
+                const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -448,47 +524,48 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.center,
                   child: Container(
-                    width: 100, height: 100,
+                    width: 100,
+                    height: 100,
                     decoration: BoxDecoration(
-                      color: cardColor, 
+                      color: cardColor,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      border:
+                          Border.all(color: Colors.white.withOpacity(0.05)),
                     ),
-                    child: const Icon(Icons.monitor_heart, size: 40, color: Color(0xFF3B82F6)),
+                    child: const Icon(Icons.monitor_heart,
+                        size: 40, color: Color(0xFF3B82F6)),
                   ),
                 ),
-                const SizedBox(height: 32), 
-                
-                const Text('Welcome Back', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 40), 
-                
-                // --- CAMPO EMAIL COM FOCO EXPLÍCITO ---
+                const SizedBox(height: 32),
+                const Text('Welcome Back',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+                const SizedBox(height: 40),
                 TextField(
-                  controller: _emailController,
-                  autofocus: true,
-                  focusNode: _emailFocus, 
-                  keyboardType: TextInputType.emailAddress, 
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _passFocus.requestFocus(), 
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _customInputDeco('Email', Icons.mail_outline)
-                ), 
-                const SizedBox(height: 16), 
-                
-                // --- CAMPO PASSWORD COM FOCO EXPLÍCITO ---
+                    controller: _emailController,
+                    autofocus: true,
+                    focusNode: _emailFocus,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _passFocus.requestFocus(),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _customInputDeco('Email', Icons.mail_outline)),
+                const SizedBox(height: 16),
                 TextField(
-                  controller: _passwordController,
-                  focusNode: _passFocus, 
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _handleLogin(), 
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _customInputDeco('Password', Icons.lock_outline)
-                ), 
-                const SizedBox(height: 32), 
-                
+                    controller: _passwordController,
+                    focusNode: _passFocus,
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _handleLogin(),
+                    style: const TextStyle(color: Colors.white),
+                    decoration:
+                        _customInputDeco('Password', Icons.lock_outline)),
+                const SizedBox(height: 32),
                 GestureDetector(
-                  onTap: _handleLogin, 
+                  onTap: _handleLogin,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 18),
@@ -496,16 +573,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       gradient: neonGradient,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                        BoxShadow(
+                            color: const Color(0xFF3B82F6).withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4)),
                       ],
                     ),
                     child: const Center(
-                      child: Text('Sign In', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: Text('Sign In',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16), 
-                
+                const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () => _showMockGoogleSignIn(context),
                   child: Container(
@@ -514,44 +597,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       color: cardColor,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      border:
+                          Border.all(color: Colors.white.withOpacity(0.05)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
                         Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
                         SizedBox(width: 8),
-                        Text('Sign in with Google', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('Sign in with Google',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 32),
-                
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? ", style: TextStyle(color: textMuted, fontSize: 14)),
+                    const Text("Don't have an account? ",
+                        style: TextStyle(color: textMuted, fontSize: 14)),
                     GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SignUpScreen()));
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => const SignUpScreen()));
                       },
-                      child: const Text('Sign Up', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.bold)),
+                      child: const Text('Sign Up',
+                          style: TextStyle(
+                              color: Color(0xFF3B82F6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
-              ]
-            )
-          )
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// --- NOVO ECRÃ DE REGISTO (SIGN UP) ---
 class SignUpScreen extends StatelessWidget {
   const SignUpScreen({super.key});
 
@@ -563,9 +654,13 @@ class SignUpScreen extends StatelessWidget {
       filled: true,
       fillColor: cardColor,
       contentPadding: const EdgeInsets.symmetric(vertical: 20),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5)),
     );
   }
 
@@ -580,63 +675,67 @@ class SignUpScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context), 
-            ),
+            icon: const Icon(Icons.arrow_back_ios_new,
+                color: Colors.white, size: 20),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 10.0), 
+            padding:
+                const EdgeInsets.symmetric(horizontal: 32.0, vertical: 10.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Create Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                const Text('Create Account',
+                    style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
                 const SizedBox(height: 8),
-                const Text('Join SmartGlycoAI today', style: TextStyle(color: textMuted, fontSize: 14)),
-                const SizedBox(height: 40), 
-                
+                const Text('Join SmartGlycoAI today',
+                    style: TextStyle(color: textMuted, fontSize: 14)),
+                const SizedBox(height: 40),
                 TextField(
-                  style: const TextStyle(color: Colors.white),
-                  textInputAction: TextInputAction.next,
-                  decoration: _customInputDeco('Full Name', Icons.person_outline)
-                ), 
-                const SizedBox(height: 16), 
-                
-                TextField(
-                  style: const TextStyle(color: Colors.white),
-                  textInputAction: TextInputAction.next,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _customInputDeco('Email', Icons.mail_outline)
-                ), 
-                const SizedBox(height: 16), 
-                
-                TextField(
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  textInputAction: TextInputAction.next,
-                  decoration: _customInputDeco('Password', Icons.lock_outline)
-                ), 
+                    style: const TextStyle(color: Colors.white),
+                    textInputAction: TextInputAction.next,
+                    decoration:
+                        _customInputDeco('Full Name', Icons.person_outline)),
                 const SizedBox(height: 16),
-                
                 TextField(
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  textInputAction: TextInputAction.done,
-                  decoration: _customInputDeco('Confirm Password', Icons.lock_outline)
-                ), 
-                const SizedBox(height: 32), 
-                
+                    style: const TextStyle(color: Colors.white),
+                    textInputAction: TextInputAction.next,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: _customInputDeco('Email', Icons.mail_outline)),
+                const SizedBox(height: 16),
+                TextField(
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white),
+                    textInputAction: TextInputAction.next,
+                    decoration:
+                        _customInputDeco('Password', Icons.lock_outline)),
+                const SizedBox(height: 16),
+                TextField(
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white),
+                    textInputAction: TextInputAction.done,
+                    decoration: _customInputDeco(
+                        'Confirm Password', Icons.lock_outline)),
+                const SizedBox(height: 32),
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    isLoggedIn = true; 
-                    currentUserId = 'paciente_joao'; // Valor por defeito ao registar no protótipo
+                    isLoggedIn = true;
+                    currentUserId = 'paciente_joao';
                     currentUserName = 'Novo Utilizador';
                     saveData();
+                    FcmNotificationService.instance
+                        .registerUserDeviceToken()
+                        .catchError((e) => debugPrint("FCM Error: $e"));
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const MainNavigator()), 
-                      (Route<dynamic> route) => false
-                    );
+                        MaterialPageRoute(
+                            builder: (_) => const MainNavigator()),
+                        (Route<dynamic> route) => false);
                   },
                   child: Container(
                     width: double.infinity,
@@ -645,19 +744,25 @@ class SignUpScreen extends StatelessWidget {
                       gradient: neonGradient,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                        BoxShadow(
+                            color: const Color(0xFF3B82F6).withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4)),
                       ],
                     ),
                     child: const Center(
-                      child: Text('Create Account', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: Text('Create Account',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16), 
-                
+                const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () {
-                    Navigator.pop(context); 
+                    Navigator.pop(context);
                   },
                   child: Container(
                     width: double.infinity,
@@ -665,40 +770,48 @@ class SignUpScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: cardColor,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      border:
+                          Border.all(color: Colors.white.withOpacity(0.05)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
                         Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
                         SizedBox(width: 8),
-                        Text('Sign up with Google', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('Sign up with Google',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 32),
-                
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Already have an account? ", style: TextStyle(color: textMuted, fontSize: 14)),
+                    const Text("Already have an account? ",
+                        style: TextStyle(color: textMuted, fontSize: 14)),
                     GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        Navigator.pop(context); 
+                        Navigator.pop(context);
                       },
-                      child: const Text('Sign In', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 14, fontWeight: FontWeight.bold)),
+                      child: const Text('Sign In',
+                          style: TextStyle(
+                              color: Color(0xFF3B82F6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-              ]
-            )
-          )
-        )
-      )
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

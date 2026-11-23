@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "358595848241",
+    "project_id": "smartglycoai",
+    "storage_bucket": "smartglycoai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:358595848241:android:3e3baf8cd542b8df204d10",
+        "android_client_info": {
+          "package_name": "com.example.smart_glyco_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXx43Wovz_iL_kZJxddriypc5cQYITmO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
