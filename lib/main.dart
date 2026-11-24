@@ -131,6 +131,11 @@ class SmartGlycoApp extends StatelessWidget {
             seedColor: Colors.teal, brightness: Brightness.dark),
         useMaterial3: true,
       ),
+      onGenerateInitialRoutes: (String initialRouteName) {
+        return [
+          MaterialPageRoute(builder: (_) => const SplashScreen()),
+        ];
+      },
       home: const SplashScreen(),
     );
   }
