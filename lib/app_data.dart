@@ -55,7 +55,7 @@ Future<void> seedDemoUsersIfMissing() async {
     'paciente_joao': {
       'name': 'João Antunes',
       'email': 'joao@smartglyco.pt',
-      'password': '123',
+      'password': '1234',
       'phone': '+351 912 345 678',
       'dob': '15/08/1998',
       'diabetesType': 'Type 1 Diabetes',
@@ -68,7 +68,7 @@ Future<void> seedDemoUsersIfMissing() async {
     'paciente_maria': {
       'name': 'Maria Silva',
       'email': 'maria@smartglyco.pt',
-      'password': '123',
+      'password': '1234',
       'phone': '+351 963 852 741',
       'dob': '22/03/1995',
       'diabetesType': 'Type 1 Diabetes',
@@ -81,7 +81,7 @@ Future<void> seedDemoUsersIfMissing() async {
     'medica_joana': {
       'name': 'Dra. Joana Sílvia',
       'email': 'joana@smartglyco.pt',
-      'password': '123',
+      'password': '1234',
       'phone': '+351 217 805 000',
       'dob': '12/04/1984',
       'diabetesType': 'Type 1 Diabetes',
@@ -370,12 +370,18 @@ Future<void> saveData() async {
 }
 
 Future<void> updateHomeWidget(String glucose, String trend, String iob) async {
-  await HomeWidget.saveWidgetData<String>('glucose_val', glucose);
-  await HomeWidget.saveWidgetData<String>('trend_val', trend);
-  await HomeWidget.saveWidgetData<String>('iob_val', 'IOB: $iob U');
+  try {
+    await HomeWidget.saveWidgetData<String>('glucose_val', glucose);
+    await HomeWidget.saveWidgetData<String>('trend_val', trend);
+    await HomeWidget.saveWidgetData<String>('iob_val', 'IOB: $iob U');
 
-  await HomeWidget.updateWidget(
-    name: 'GlycoWidgetProvider',
-    iOSName: 'GlycoWidget',
-  );
+    await HomeWidget.updateWidget(
+      name: 'GlycoWidgetProvider',
+      iOSName: 'GlycoWidget',
+    );
+  } catch (e) {
+    // No iOS sem AppGroup configurado no Xcode, ignora o erro do widget
+    // para não interromper o login nem o saveData()
+    debugPrint('ℹ️ HomeWidget ignorado nesta plataforma: $e');
+  }
 }
