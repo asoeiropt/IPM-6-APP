@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../app_data.dart';
+import '../main_navigator.dart';
 
 class ManualEntryScreen extends StatefulWidget {
   final String initialType;
@@ -56,6 +57,16 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     cCtrl.dispose();
     iCtrl.dispose();
     super.dispose();
+  }
+
+  void _exitScreen() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainNavigator()),
+      );
+    }
   }
 
   double _parsePositive(String raw) {
@@ -219,7 +230,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
         backgroundColor: isHighContrast
             ? const Color(0xFFFFD600)
             : const Color(0xFF2DD4BF)));
-    Navigator.of(context).pop();
+    _exitScreen();
   }
 
   Future<void> _scanBarcode() async {
@@ -398,7 +409,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: _exitScreen,
                       child: Icon(Icons.arrow_back_ios_new,
                           color: mainTextColor, size: 20),
                     ),
