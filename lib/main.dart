@@ -3,6 +3,8 @@ import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'app_data.dart';
 import 'fcm_notification_service.dart';
 import 'startup_screens.dart';
 
@@ -13,6 +15,10 @@ void callbackDispatcher() {
       debugPrint("====================================================");
       debugPrint("🔄 CGM BACKGROUND TASK: A ler sensor...");
 
+      final prefs = await SharedPreferences.getInstance();
+      final bool isPt = prefs.getBool('isPortuguese') ?? false;
+      String bgTr(String pt, String en) => isPt ? pt : en;
+
       int simulatedGlucose = 65;
 
       if (simulatedGlucose < 70) {
@@ -21,33 +27,36 @@ void callbackDispatcher() {
 
         FlutterLocalNotificationsPlugin flip = FlutterLocalNotificationsPlugin();
 
-        var android = const AndroidInitializationSettings('@mipmap/ic_launcher');
-        var settings = InitializationSettings(android: android);
+        const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+        const settings = InitializationSettings(android: android);
 
         await flip.initialize(settings);
 
-        var androidPlatformChannelSpecifics = const AndroidNotificationDetails(
+        final androidPlatformChannelSpecifics = AndroidNotificationDetails(
           'cgm_alerts_channel',
-          'CGM Alerts',
+          bgTr('Alertas CGM', 'CGM Alerts'),
           importance: Importance.max,
           priority: Priority.high,
-          color: Color(0xFFF43F5E),
+          color: const Color(0xFFF43F5E),
           enableVibration: true,
           actions: <AndroidNotificationAction>[
             AndroidNotificationAction(
               'action_juice',
-              '🧃 Registar 15g Sumo',
+              bgTr('🧃 Registar 15g Sumo', '🧃 Log 15g Juice'),
               showsUserInterface: true,
             ),
           ],
         );
-        var platformChannelSpecifics =
+        final platformChannelSpecifics =
             NotificationDetails(android: androidPlatformChannelSpecifics);
 
         await flip.show(
           0,
-          '🚨 Alerta Preditivo (CGM)',
-          'A tua glicose desceu para $simulatedGlucose mg/dL. Ingere hidratos rápidos!',
+          bgTr('🚨 Alerta Preditivo (CGM)', '🚨 Predictive Alert (CGM)'),
+          bgTr(
+            'A tua glicose desceu para $simulatedGlucose mg/dL. Ingere hidratos rápidos!',
+            'Your glucose dropped to $simulatedGlucose mg/dL. Take fast-acting carbs!',
+          ),
           platformChannelSpecifics,
         );
       }

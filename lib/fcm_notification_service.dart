@@ -46,10 +46,13 @@ class FcmNotificationService {
         const InitializationSettings(android: androidInit, iOS: iosInit),
       );
 
-      const channel = AndroidNotificationChannel(
+      final channel = AndroidNotificationChannel(
         'smartglyco_fcm_channel',
-        'Mensagens Clínicas Push',
-        description: 'Notificações instantâneas entre médico e paciente',
+        tr('Mensagens Clínicas Push', 'Clinical Push Messages'),
+        description: tr(
+          'Notificações instantâneas entre médico e paciente',
+          'Instant notifications between doctor and patient',
+        ),
         importance: Importance.max,
       );
 
@@ -66,17 +69,17 @@ class FcmNotificationService {
             DateTime.now().millisecondsSinceEpoch ~/ 1000,
             notification.title ?? 'SmartGlycoAI',
             notification.body ?? '',
-            const NotificationDetails(
+            NotificationDetails(
               android: AndroidNotificationDetails(
                 'smartglyco_fcm_channel',
-                'Mensagens Clínicas Push',
+                tr('Mensagens Clínicas Push', 'Clinical Push Messages'),
                 importance: Importance.max,
                 priority: Priority.high,
-                color: Color(0xFF3B82F6),
+                color: const Color(0xFF3B82F6),
                 playSound: true,
                 enableVibration: true,
               ),
-              iOS: DarwinNotificationDetails(
+              iOS: const DarwinNotificationDetails(
                 presentAlert: true,
                 presentBadge: true,
                 presentSound: true,

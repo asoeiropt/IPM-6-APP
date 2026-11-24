@@ -1,8 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- PERMISSÕES NECESSÁRIAS -->
+    <!-- PERMISSÕES DE REDE (FIREBASE / FIRESTORE / FCM / OPENFOODFACTS) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- PERMISSÕES DE CÂMARA E GALERIA (IMAGE_PICKER & SCANNER) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- PERMISSÕES DE NOTIFICAÇÕES, BIOMETRIA E SAÚDE -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -10,9 +18,15 @@
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
     <uses-permission android:name="android.permission.health.READ_SLEEP"/>
 
-    <!-- BLOCO OBRIGATÓRIO PARA A APP COMUNICAR COM O HEALTH CONNECT -->
+    <!-- BLOCO OBRIGATÓRIO PARA HEALTH CONNECT E IMAGE_PICKER -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
@@ -20,7 +34,7 @@
     </queries>
 
     <application
-        android:label="smart_glyco_ai"
+        android:label="SmartGlycoAI"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         
@@ -47,7 +61,7 @@
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.category.BOOT_COMPLETED"/>
                 <action android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </receiver>

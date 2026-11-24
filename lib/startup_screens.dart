@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'app_data.dart';
 import 'fcm_notification_service.dart';
 import 'main_navigator.dart';
@@ -15,6 +17,40 @@ const Gradient dangerGradient = LinearGradient(
 );
 const Color textMuted = Color(0xFF64748B);
 
+Widget _buildLanguagePillButton(VoidCallback onChanged) {
+  return GestureDetector(
+    onTap: () {
+      HapticFeedback.selectionClick();
+      isPortuguese = !isPortuguese;
+      saveData();
+      onChanged();
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.language, color: Color(0xFF3B82F6), size: 16),
+          const SizedBox(width: 6),
+          Text(
+            isPortuguese ? 'PT' : 'EN',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
@@ -22,6 +58,9 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _navigated = false;
+  bool _dataLoaded = false;
+
   @override
   void initState() {
     super.initState();
@@ -29,50 +68,89 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startAppEngines() async {
-    await Future.delayed(const Duration(seconds: 10));
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    try {
+      await loadData().timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint("⚠️ Erro ou timeout ao carregar dados locais: $e");
     }
+    _dataLoaded = true;
+
+    // Garante que João, Maria e Dra. Joana existem na coleção 'users' do Firestore
+    seedDemoUsersIfMissing()
+        .catchError((e) => debugPrint("⚠️ Seed Firestore: $e"));
+
+    await Future.delayed(const Duration(milliseconds: 1500));
+    _goNext();
+  }
+
+  void _goNext() {
+    if (_navigated || !mounted || !_dataLoaded) return;
+    _navigated = true;
+
+    Widget nextScreen;
+
+    if (isLoggedIn && currentUserId.isNotEmpty) {
+      FcmNotificationService.instance
+          .registerUserDeviceToken()
+          .catchError((e) => debugPrint("FCM Error: $e"));
+
+      if (useBiometrics) {
+        nextScreen = const LockScreen();
+      } else {
+        nextScreen = currentUserId == 'medica_joana'
+            ? const DoctorDashboard()
+            : const MainNavigator();
+      }
+    } else if (!isFirstTime) {
+      nextScreen = const LoginScreen();
+    } else {
+      nextScreen = const OnboardingScreen();
+    }
+
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => nextScreen));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/splash_logo.jpg'),
-            fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: _goNext,
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/splash_logo.jpg'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 48.0),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                            color: const Color(0xFF3B82F6).withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5),
-                      ]),
-                  child: const CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
+          child: SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 48.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: const Color(0xFF3B82F6).withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 5),
+                        ]),
+                    child: const CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -97,7 +175,10 @@ class _LockScreenState extends State<LockScreen> {
     bool authenticated = false;
     try {
       authenticated = await biometricAuth.authenticate(
-          localizedReason: 'Please authenticate to access your health data.');
+          localizedReason: tr(
+        'Autentica-te para aceder aos teus dados de saúde.',
+        'Please authenticate to access your health data.',
+      ));
     } catch (e) {
       debugPrint("Biometric Error: $e");
     }
@@ -139,14 +220,16 @@ class _LockScreenState extends State<LockScreen> {
                 size: 50, color: Color(0xFFF43F5E)),
           ),
           const SizedBox(height: 32),
-          const Text('App Locked',
-              style: TextStyle(
+          Text(tr('Aplicação Bloqueada', 'App Locked'),
+              style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   color: Colors.white)),
           const SizedBox(height: 8),
-          const Text('Biometric protection enabled.',
-              style: TextStyle(color: textMuted, fontSize: 14)),
+          Text(
+              tr('Proteção biométrica ativa.',
+                  'Biometric protection enabled.'),
+              style: const TextStyle(color: textMuted, fontSize: 14)),
           const SizedBox(height: 40),
           GestureDetector(
             onTap: _authenticate,
@@ -164,11 +247,11 @@ class _LockScreenState extends State<LockScreen> {
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.fingerprint, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text('Try Again',
-                      style: TextStyle(
+                children: [
+                  const Icon(Icons.fingerprint, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Text(tr('Tentar Novamente', 'Try Again'),
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold)),
@@ -196,19 +279,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         backgroundColor: bgColor,
         body: SafeArea(
             child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 16, right: 24),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _buildLanguagePillButton(() => setState(() {})),
+            ),
+          ),
           Expanded(
               child: PageView(
                   controller: _pageController,
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
-                _buildPage(Icons.health_and_safety, 'Welcome to\nSmartGlycoAI',
-                    'Your smart assistant for diabetes\nmanagement.'),
-                _buildPage(Icons.camera_alt_outlined, 'AI Calculation',
-                    'Take a picture of your meal and our AI will\nsuggest the exact insulin dose.'),
+                _buildPage(
+                    Icons.health_and_safety,
+                    tr('Bem-vindo à\nSmartGlycoAI', 'Welcome to\nSmartGlycoAI'),
+                    tr('O teu assistente inteligente para a\ngestão da Diabetes Tipo 1.',
+                        'Your smart assistant for Type 1\ndiabetes management.')),
+                _buildPage(
+                    Icons.camera_alt_outlined,
+                    tr('Cálculo por IA', 'AI Calculation'),
+                    tr(
+                        'Fotografa a tua refeição e a nossa IA\nsugere a dose exata de insulina.',
+                        'Take a picture of your meal and our AI will\nsuggest the exact insulin dose.')),
                 _buildPage(
                     Icons.notifications_active_outlined,
-                    'Crisis Prevention',
-                    'Predictive warnings before a hypoglycemia\noccurs.')
+                    tr('Prevenção de Crises', 'Crisis Prevention'),
+                    tr('Avisos preditivos antes de ocorrer\numa hipoglicemia.',
+                        'Predictive warnings before a hypoglycemia\noccurs.'))
               ])),
           Padding(
               padding: const EdgeInsets.all(32.0),
@@ -233,6 +331,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         HapticFeedback.lightImpact();
                         if (_currentPage == 2) {
                           isFirstTime = false;
+                          saveData();
                           Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
                                   builder: (_) => const LoginScreen()));
@@ -255,7 +354,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 offset: const Offset(0, 4)),
                           ],
                         ),
-                        child: Text(_currentPage == 2 ? 'Start' : 'Next',
+                        child: Text(
+                            _currentPage == 2
+                                ? tr('Começar', 'Start')
+                                : tr('Seguinte', 'Next'),
                             style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -321,6 +423,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _passFocus = FocusNode();
 
+  bool _obscurePassword = true;
+  bool _isLoading = false;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -343,19 +448,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    children: const [
-                      Icon(Icons.g_mobiledata, size: 40, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Sign in with Google',
-                          style: TextStyle(
+                    children: [
+                      const Icon(Icons.g_mobiledata,
+                          size: 40, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(
+                          tr('Entrar com o Google', 'Sign in with Google'),
+                          style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Colors.white)),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text('Choose an account to continue to SmartGlycoAI',
-                      style: TextStyle(color: textMuted, fontSize: 14)),
+                  Text(
+                      tr('Escolhe uma conta para continuar na SmartGlycoAI',
+                          'Choose an account to continue to SmartGlycoAI'),
+                      style: const TextStyle(color: textMuted, fontSize: 14)),
                   const SizedBox(height: 24),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -376,15 +485,21 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: Colors.white, fontWeight: FontWeight.bold)),
                     subtitle: const Text('afonso.soeiro@gmail.com',
                         style: TextStyle(color: textMuted)),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(ctx);
+                      isFirstTime = false;
                       isLoggedIn = true;
                       currentUserId = 'paciente_joao';
                       currentUserName = 'Afonso Soeiro';
-                      saveData();
+                      currentUserEmail = 'afonso.soeiro@gmail.com';
+                      currentUserPhone = '+351 912 345 678';
+                      currentUserDob = '15/08/2003';
+                      currentDiagnosisYear = '2020';
+                      await saveData();
                       FcmNotificationService.instance
                           .registerUserDeviceToken()
                           .catchError((e) => debugPrint("FCM Error: $e"));
+                      if (!mounted) return;
                       Navigator.of(context).pushReplacement(MaterialPageRoute(
                           builder: (_) => const MainNavigator()));
                     },
@@ -400,8 +515,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Icon(Icons.person_add,
                           color: Colors.white54, size: 20),
                     ),
-                    title: const Text('Add another account',
-                        style: TextStyle(
+                    title: Text(
+                        tr('Adicionar outra conta', 'Add another account'),
+                        style: const TextStyle(
                             color: Colors.white, fontWeight: FontWeight.w500)),
                     onTap: () => Navigator.pop(ctx),
                   ),
@@ -409,11 +525,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 ])));
   }
 
-  InputDecoration _customInputDeco(String hint, IconData icon) {
+  InputDecoration _customInputDeco(String hint, IconData icon,
+      {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: textMuted, fontSize: 15),
       prefixIcon: Icon(icon, color: textMuted, size: 20),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: cardColor,
       contentPadding: const EdgeInsets.symmetric(vertical: 20),
@@ -427,7 +545,29 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _handleLogin() {
+  Future<void> _syncDemoUserFromFirestore(String docId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(docId)
+          .get();
+      if (doc.exists && doc.data() != null) {
+        final d = doc.data()!;
+        currentUserName = (d['name'] ?? currentUserName).toString();
+        currentUserEmail = (d['email'] ?? currentUserEmail).toString();
+        currentUserPhone = (d['phone'] ?? currentUserPhone).toString();
+        currentUserDob = (d['dob'] ?? currentUserDob).toString();
+        currentDiagnosisYear =
+            (d['diagnosisYear'] ?? currentDiagnosisYear).toString();
+        if (d['icr'] != null) globalIcr = (d['icr'] as num).toDouble();
+        if (d['isf'] != null) globalIsf = (d['isf'] as num).toDouble();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Erro ao ler dados atualizados de $docId: $e');
+    }
+  }
+
+  Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
     HapticFeedback.lightImpact();
 
@@ -436,73 +576,151 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Por favor, preenche o email e a password.')),
+        SnackBar(
+            content: Text(tr(
+          'Por favor, preenche o email e a palavra-passe.',
+          'Please enter your email and password.',
+        ))),
       );
       return;
     }
 
+    setState(() => _isLoading = true);
+
     try {
-      // --- LIGAÇÃO MÉDICA ---
+      // 1. CONTAS DE DEMONSTRAÇÃO PRÉ-DEFINIDAS (com leitura do Firestore se editadas)
       if ((email == 'joana@smartglyco.pt' || email == 'medica') &&
           password == '1234') {
+        isFirstTime = false;
         isLoggedIn = true;
         currentUserId = 'medica_joana';
-        currentUserName = 'Dra. Joana Silvia';
-        saveData();
+        currentUserName = 'Dra. Joana Sílvia';
+        currentUserEmail = 'joana@smartglyco.pt';
+        currentUserPhone = '+351 217 805 000';
+        currentUserDob = '12/04/1984';
+        currentDiagnosisYear = '';
+        await _syncDemoUserFromFirestore('medica_joana');
+        await saveData();
         FcmNotificationService.instance
             .registerUserDeviceToken()
             .catchError((e) => debugPrint("FCM Error: $e"));
 
-        debugPrint("👩‍⚕️ LOGIN EFETUADO: Dra. Joana Silvia");
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const DoctorDashboard()));
+        return;
+      }
 
-        // --- LIGAÇÃO PACIENTE 1 (JOÃO) ---
-      } else if ((email == 'joao@smartglyco.pt' || email == 'joao') &&
+      if ((email == 'joao@smartglyco.pt' || email == 'joao') &&
           password == '1234') {
+        isFirstTime = false;
         isLoggedIn = true;
         currentUserId = 'paciente_joao';
         currentUserName = 'João Antunes';
-        saveData();
+        currentUserEmail = 'joao@smartglyco.pt';
+        currentUserPhone = '+351 912 345 678';
+        currentUserDob = '15/08/1998';
+        currentDiagnosisYear = '2021';
+        await _syncDemoUserFromFirestore('paciente_joao');
+        await saveData();
         FcmNotificationService.instance
             .registerUserDeviceToken()
             .catchError((e) => debugPrint("FCM Error: $e"));
 
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const MainNavigator()));
+        return;
+      }
 
-        // --- LIGAÇÃO PACIENTE 2 (MARIA) ---
-      } else if ((email == 'maria@smartglyco.pt' || email == 'maria') &&
+      if ((email == 'maria@smartglyco.pt' || email == 'maria') &&
           password == '1234') {
+        isFirstTime = false;
         isLoggedIn = true;
         currentUserId = 'paciente_maria';
         currentUserName = 'Maria Silva';
-        saveData();
+        currentUserEmail = 'maria@smartglyco.pt';
+        currentUserPhone = '+351 963 852 741';
+        currentUserDob = '22/03/1995';
+        currentDiagnosisYear = '2019';
+        await _syncDemoUserFromFirestore('paciente_maria');
+        await saveData();
         FcmNotificationService.instance
             .registerUserDeviceToken()
             .catchError((e) => debugPrint("FCM Error: $e"));
 
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const MainNavigator()));
-      } else {
-        isLoggedIn = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFFF43F5E),
-            content: Text(
-                'Credenciais incorretas! Tenta joao@ ou joana@ com a pass 1234'),
-          ),
-        );
+        return;
       }
+
+      // 2. PROCURAR CONTAS CRIADAS NO CLOUD FIRESTORE (coleção 'users')
+      final querySnap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (querySnap.docs.isNotEmpty) {
+        final userDoc = querySnap.docs.first;
+        final userData = userDoc.data();
+        final savedPass = (userData['password'] ?? '').toString();
+
+        if (savedPass == password) {
+          isFirstTime = false;
+          isLoggedIn = true;
+          currentUserId = userDoc.id;
+          currentUserName =
+              (userData['name'] ?? tr('Utilizador', 'User')).toString();
+          currentUserEmail = (userData['email'] ?? email).toString();
+          currentUserPhone = (userData['phone'] ?? '').toString();
+          currentUserDob = (userData['dob'] ?? '').toString();
+          currentDiagnosisYear = (userData['diagnosisYear'] ?? '').toString();
+          if (userData['icr'] != null) {
+            globalIcr = (userData['icr'] as num).toDouble();
+          }
+          if (userData['isf'] != null) {
+            globalIsf = (userData['isf'] as num).toDouble();
+          }
+          await saveData();
+
+          FcmNotificationService.instance
+              .registerUserDeviceToken()
+              .catchError((e) => debugPrint("FCM Error: $e"));
+
+          if (!mounted) return;
+          final bool isDoctor = (userData['role'] ?? 'patient') == 'doctor';
+          Navigator.of(context).pushReplacement(MaterialPageRoute(
+              builder: (_) => isDoctor
+                  ? const DoctorDashboard()
+                  : const MainNavigator()));
+          return;
+        }
+      }
+
+      isLoggedIn = false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFF43F5E),
+          content: Text(tr(
+            'Credenciais incorretas! Usa a tua conta registada ou joao / maria / medica (pass: 1234).',
+            'Incorrect credentials! Use your registered account or joao / maria / medica (pass: 1234).',
+          )),
+        ),
+      );
     } catch (e, st) {
       debugPrint("❌ ERRO NO LOGIN: $e\n$st");
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red,
-          content: Text('Erro ao entrar: $e'),
+          content: Text('${tr('Erro ao entrar', 'Login error')}: $e'),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -516,11 +734,16 @@ class _LoginScreenState extends State<LoginScreen> {
         body: SafeArea(
           child: SingleChildScrollView(
             padding:
-                const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
+                const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _buildLanguagePillButton(() => setState(() {})),
+                ),
+                const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.center,
                   child: Container(
@@ -537,9 +760,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                const Text('Welcome Back',
+                Text(tr('Bem-vindo de Volta', 'Welcome Back'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white)),
@@ -552,20 +775,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => _passFocus.requestFocus(),
                     style: const TextStyle(color: Colors.white),
-                    decoration: _customInputDeco('Email', Icons.mail_outline)),
+                    decoration: _customInputDeco(
+                        tr('Email', 'Email'), Icons.mail_outline)),
                 const SizedBox(height: 16),
                 TextField(
                     controller: _passwordController,
                     focusNode: _passFocus,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _handleLogin(),
                     style: const TextStyle(color: Colors.white),
-                    decoration:
-                        _customInputDeco('Password', Icons.lock_outline)),
+                    decoration: _customInputDeco(
+                      tr('Palavra-passe', 'Password'),
+                      Icons.lock_outline,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: textMuted,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                      ),
+                    )),
                 const SizedBox(height: 32),
                 GestureDetector(
-                  onTap: _handleLogin,
+                  onTap: _isLoading ? null : _handleLogin,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 18),
@@ -579,12 +817,19 @@ class _LoginScreenState extends State<LoginScreen> {
                             offset: const Offset(0, 4)),
                       ],
                     ),
-                    child: const Center(
-                      child: Text('Sign In',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
+                    child: Center(
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(tr('Entrar', 'Sign In'),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -602,11 +847,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text('Sign in with Google',
-                            style: TextStyle(
+                      children: [
+                        const Icon(Icons.g_mobiledata,
+                            size: 26, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(tr('Entrar com o Google', 'Sign in with Google'),
+                            style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold)),
@@ -618,16 +864,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? ",
-                        style: TextStyle(color: textMuted, fontSize: 14)),
+                    Text(
+                        tr('Não tens conta? ', "Don't have an account? "),
+                        style: const TextStyle(color: textMuted, fontSize: 14)),
                     GestureDetector(
-                      onTap: () {
+                      onTap: () async {
                         HapticFeedback.lightImpact();
-                        Navigator.of(context).push(MaterialPageRoute(
+                        await Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) => const SignUpScreen()));
+                        if (mounted) setState(() {});
                       },
-                      child: const Text('Sign Up',
-                          style: TextStyle(
+                      child: Text(tr('Criar Conta', 'Sign Up'),
+                          style: const TextStyle(
                               color: Color(0xFF3B82F6),
                               fontSize: 14,
                               fontWeight: FontWeight.bold)),
@@ -643,17 +891,66 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class SignUpScreen extends StatelessWidget {
+class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
-  InputDecoration _customInputDeco(String hint, IconData icon) {
+  @override
+  State<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends State<SignUpScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
+  final TextEditingController _diagnosisYearController =
+      TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _isCreating = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    _diagnosisYearController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(1998, 8, 15),
+      firstDate: DateTime(1920),
+      lastDate: now,
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _dobController.text =
+            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      });
+    }
+  }
+
+  InputDecoration _customInputDeco(String hint, IconData icon,
+      {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: textMuted, fontSize: 15),
       prefixIcon: Icon(icon, color: textMuted, size: 20),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: cardColor,
-      contentPadding: const EdgeInsets.symmetric(vertical: 20),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
@@ -662,6 +959,188 @@ class SignUpScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5)),
     );
+  }
+
+  String _buildInitials(String fullName) {
+    final parts = fullName.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return fullName.isNotEmpty ? fullName[0].toUpperCase() : 'P';
+  }
+
+  Future<void> _handleSignUp() async {
+    FocusScope.of(context).unfocus();
+    HapticFeedback.lightImpact();
+
+    final String name = _nameController.text.trim();
+    final String email = _emailController.text.trim().toLowerCase();
+    final String phone = _phoneController.text.trim();
+    final String dob = _dobController.text.trim();
+    final String diagnosisYear = _diagnosisYearController.text.trim();
+    final String password = _passwordController.text.trim();
+    final String confirmPassword = _confirmPasswordController.text.trim();
+
+    if (name.isEmpty ||
+        email.isEmpty ||
+        phone.isEmpty ||
+        dob.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFF43F5E),
+          content: Text(tr(
+            '⚠️ Preenche todos os campos obrigatórios antes de criar conta.',
+            '⚠️ Fill in all required fields before creating an account.',
+          )),
+        ),
+      );
+      return;
+    }
+
+    if (!email.contains('@') || !email.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFF43F5E),
+          content: Text(tr(
+            '⚠️ Introduz um endereço de email válido.',
+            '⚠️ Please enter a valid email address.',
+          )),
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFF43F5E),
+          content: Text(tr(
+            '⚠️ A palavra-passe deve ter pelo menos 4 caracteres.',
+            '⚠️ Password must be at least 4 characters long.',
+          )),
+        ),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFF43F5E),
+          content: Text(tr(
+            '⚠️ As palavras-passe não coincidem.',
+            '⚠️ Passwords do not match.',
+          )),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isCreating = true);
+
+    try {
+      final existing = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (existing.docs.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFF43F5E),
+            content: Text(tr(
+              '⚠️ Já existe uma conta registada com esse email.',
+              '⚠️ An account with this email already exists.',
+            )),
+          ),
+        );
+        setState(() => _isCreating = false);
+        return;
+      }
+
+      final sanitizedEmail = email.replaceAll(RegExp(r'[^a-z0-9]'), '_');
+      final String newUserId = 'paciente_$sanitizedEmail';
+      final String initials = _buildInitials(name);
+
+      await FirebaseFirestore.instance.collection('users').doc(newUserId).set({
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'dob': dob,
+        'diabetesType': 'Type 1 Diabetes',
+        'diagnosisYear': diagnosisYear,
+        'password': password,
+        'role': 'patient',
+        'initials': initials,
+        'icr': 15.0,
+        'isf': 50.0,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      await FirebaseFirestore.instance
+          .collection('appointments')
+          .doc(newUserId)
+          .set({
+        'patientId': newUserId,
+        'patientName': name,
+        'initials': initials,
+        'date': DateFormat('dd/MM/yyyy').format(tomorrow),
+        'time': '11:00 AM',
+        'type': tr('Primeira Consulta', 'First Visit'),
+        'isCompleted': false,
+      }, SetOptions(merge: true));
+
+      isFirstTime = false;
+      isLoggedIn = true;
+      currentUserId = newUserId;
+      currentUserName = name;
+      currentUserEmail = email;
+      currentUserPhone = phone;
+      currentUserDob = dob;
+      currentDiagnosisYear = diagnosisYear;
+      globalIcr = 15.0;
+      globalIsf = 50.0;
+      await saveData();
+
+      FcmNotificationService.instance
+          .registerUserDeviceToken()
+          .catchError((e) => debugPrint("FCM Error: $e"));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF2DD4BF),
+          content: Text(
+            tr(
+              '✅ Conta criada com sucesso! Bem-vindo(a), $name.',
+              '✅ Account created successfully! Welcome, $name.',
+            ),
+            style: const TextStyle(
+                color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+
+      Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigator()),
+          (Route<dynamic> route) => false);
+    } catch (e) {
+      debugPrint('❌ Erro ao criar conta no Firestore: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('${tr('Erro ao criar conta', 'Sign up error')}: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
+    }
   }
 
   @override
@@ -679,64 +1158,126 @@ class SignUpScreen extends StatelessWidget {
                 color: Colors.white, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 24, top: 8, bottom: 8),
+              child: _buildLanguagePillButton(() => setState(() {})),
+            ),
+          ],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding:
-                const EdgeInsets.symmetric(horizontal: 32.0, vertical: 10.0),
+                const EdgeInsets.symmetric(horizontal: 28.0, vertical: 10.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Create Account',
-                    style: TextStyle(
+                Text(tr('Criar Conta', 'Create Account'),
+                    style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white)),
                 const SizedBox(height: 8),
-                const Text('Join SmartGlycoAI today',
-                    style: TextStyle(color: textMuted, fontSize: 14)),
-                const SizedBox(height: 40),
+                Text(
+                    tr('Gestão inteligente para Diabetes Tipo 1',
+                        'Smart management for Type 1 Diabetes'),
+                    style: const TextStyle(color: textMuted, fontSize: 14)),
+                const SizedBox(height: 28),
                 TextField(
+                    controller: _nameController,
                     style: const TextStyle(color: Colors.white),
                     textInputAction: TextInputAction.next,
-                    decoration:
-                        _customInputDeco('Full Name', Icons.person_outline)),
-                const SizedBox(height: 16),
+                    decoration: _customInputDeco(
+                        tr('Nome Completo', 'Full Name'),
+                        Icons.person_outline)),
+                const SizedBox(height: 14),
                 TextField(
+                    controller: _emailController,
                     style: const TextStyle(color: Colors.white),
                     textInputAction: TextInputAction.next,
                     keyboardType: TextInputType.emailAddress,
                     decoration: _customInputDeco('Email', Icons.mail_outline)),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 TextField(
-                    obscureText: true,
+                    controller: _phoneController,
                     style: const TextStyle(color: Colors.white),
                     textInputAction: TextInputAction.next,
-                    decoration:
-                        _customInputDeco('Password', Icons.lock_outline)),
-                const SizedBox(height: 16),
+                    keyboardType: TextInputType.phone,
+                    decoration: _customInputDeco(
+                        tr('Telemóvel (ex: +351 912...)',
+                            'Phone (e.g. +351 912...)'),
+                        Icons.phone_outlined)),
+                const SizedBox(height: 14),
                 TextField(
-                    obscureText: true,
+                    controller: _dobController,
+                    readOnly: true,
+                    onTap: _pickDob,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _customInputDeco(
+                      tr('Data de Nascimento', 'Date of Birth'),
+                      Icons.calendar_today_outlined,
+                      suffixIcon: const Icon(Icons.edit_calendar,
+                          color: textMuted, size: 18),
+                    )),
+                const SizedBox(height: 14),
+                TextField(
+                    controller: _diagnosisYearController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: _customInputDeco(
+                        tr('Ano de Diagnóstico Tipo 1 (opcional)',
+                            'Type 1 Diagnosis Year (optional)'),
+                        Icons.history_edu_outlined)),
+                const SizedBox(height: 14),
+                TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: const TextStyle(color: Colors.white),
+                    textInputAction: TextInputAction.next,
+                    decoration: _customInputDeco(
+                      tr('Palavra-passe', 'Password'),
+                      Icons.lock_outline,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: textMuted,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                      ),
+                    )),
+                const SizedBox(height: 14),
+                TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
                     style: const TextStyle(color: Colors.white),
                     textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _handleSignUp(),
                     decoration: _customInputDeco(
-                        'Confirm Password', Icons.lock_outline)),
-                const SizedBox(height: 32),
+                      tr('Confirmar Palavra-passe', 'Confirm Password'),
+                      Icons.lock_outline,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: textMuted,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscureConfirmPassword =
+                              !_obscureConfirmPassword);
+                        },
+                      ),
+                    )),
+                const SizedBox(height: 28),
                 GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    isLoggedIn = true;
-                    currentUserId = 'paciente_joao';
-                    currentUserName = 'Novo Utilizador';
-                    saveData();
-                    FcmNotificationService.instance
-                        .registerUserDeviceToken()
-                        .catchError((e) => debugPrint("FCM Error: $e"));
-                    Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                            builder: (_) => const MainNavigator()),
-                        (Route<dynamic> route) => false);
-                  },
+                  onTap: _isCreating ? null : _handleSignUp,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 18),
@@ -750,12 +1291,19 @@ class SignUpScreen extends StatelessWidget {
                             offset: const Offset(0, 4)),
                       ],
                     ),
-                    child: const Center(
-                      child: Text('Create Account',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
+                    child: Center(
+                      child: _isCreating
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(tr('Criar Conta', 'Create Account'),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -775,11 +1323,13 @@ class SignUpScreen extends StatelessWidget {
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.g_mobiledata, size: 26, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text('Sign up with Google',
-                            style: TextStyle(
+                      children: [
+                        const Icon(Icons.g_mobiledata,
+                            size: 26, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(
+                            tr('Registar com o Google', 'Sign up with Google'),
+                            style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold)),
@@ -787,19 +1337,21 @@ class SignUpScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Already have an account? ",
-                        style: TextStyle(color: textMuted, fontSize: 14)),
+                    Text(
+                        tr('Já tens uma conta? ',
+                            'Already have an account? '),
+                        style: const TextStyle(color: textMuted, fontSize: 14)),
                     GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
                         Navigator.pop(context);
                       },
-                      child: const Text('Sign In',
-                          style: TextStyle(
+                      child: Text(tr('Entrar', 'Sign In'),
+                          style: const TextStyle(
                               color: Color(0xFF3B82F6),
                               fontSize: 14,
                               fontWeight: FontWeight.bold)),
