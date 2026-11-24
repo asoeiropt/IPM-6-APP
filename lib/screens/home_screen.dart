@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'medication_screen.dart';
 import 'activity_screen.dart';
 import 'report_screen.dart';
 import '../app_data.dart';
+import '../adaptive_glass.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -260,15 +262,20 @@ class _HomeTabState extends State<HomeTab> {
               ),
               const SizedBox(height: 12),
 
-              Container(
+              // --- CARTÃO DE PREVISÃO IA (GLASS NO IPHONE) ---
+              _buildGlassOrSolidWrapper(
+                borderRadius: 14,
+                tintColors: [
+                  chartForecastColor.withOpacity(0.16),
+                  chartForecastColor.withOpacity(0.06),
+                ],
+                solidColor: isHighContrast ? Colors.black : chartForecastColor.withOpacity(0.1),
+                borderColor: isHighContrast
+                    ? Colors.white
+                    : (isIosLiquidGlass
+                        ? Colors.white.withOpacity(0.25)
+                        : chartForecastColor.withOpacity(0.3)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isHighContrast ? Colors.black : chartForecastColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: isHighContrast ? Colors.white : chartForecastColor.withOpacity(0.3),
-                      width: isHighContrast ? 2 : 1),
-                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -357,26 +364,29 @@ class _HomeTabState extends State<HomeTab> {
               ),
               const SizedBox(height: 16),
 
+              // --- CARTÃO PRÓXIMA MEDICAÇÃO (GLASS NO IPHONE) ---
               GestureDetector(
                 onTap: () {
                   Navigator.push(
                       context, MaterialPageRoute(builder: (context) => const MedicationScreen()));
                 },
-                child: Container(
-                  width: double.infinity,
+                child: _buildGlassOrSolidWrapper(
+                  borderRadius: 24,
+                  tintColors: [
+                    const Color(0xFF5A449A).withOpacity(0.45),
+                    const Color(0xFF3D277A).withOpacity(0.25),
+                  ],
+                  gradient: isHighContrast
+                      ? null
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF5A449A), Color(0xFF3D277A)]),
+                  solidColor: Colors.black,
+                  borderColor: isHighContrast
+                      ? const Color(0xFFFFD600)
+                      : Colors.white.withOpacity(0.25),
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isHighContrast ? Colors.black : null,
-                    gradient: isHighContrast
-                        ? null
-                        : const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF5A449A), Color(0xFF3D277A)]),
-                    borderRadius: BorderRadius.circular(24),
-                    border:
-                        isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 2) : null,
-                  ),
                   child: Row(
                     children: [
                       Container(
@@ -431,6 +441,60 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  /// Aplica vidro translúcido tingido APENAS no iPhone (isIosLiquidGlass),
+  /// mantendo exatamente o design sólido/gradiente no Android, Web e Alto Contraste.
+  Widget _buildGlassOrSolidWrapper({
+    required Widget child,
+    required double borderRadius,
+    required List<Color> tintColors,
+    Gradient? gradient,
+    Color? solidColor,
+    Color? borderColor,
+    required EdgeInsetsGeometry padding,
+  }) {
+    if (!isIosLiquidGlass) {
+      return Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: isHighContrast ? Colors.black : (gradient == null ? solidColor : null),
+          gradient: isHighContrast ? null : gradient,
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: isHighContrast
+              ? Border.all(color: const Color(0xFFFFD600), width: 2)
+              : (borderColor != null && gradient == null
+                  ? Border.all(color: borderColor, width: 1)
+                  : null),
+        ),
+        child: child,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: double.infinity,
+          padding: padding,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(borderRadius),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: tintColors,
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.25),
+              width: 1.2,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   Widget _buildGradientCard(
       {required String title,
       required String value,
@@ -438,16 +502,19 @@ class _HomeTabState extends State<HomeTab> {
       required IconData icon,
       required Gradient gradient,
       VoidCallback? onTap}) {
+    final List<Color> gradColors =
+        gradient is LinearGradient ? gradient.colors : [const Color(0xFF3B82F6), const Color(0xFF1E45A8)];
+
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: _buildGlassOrSolidWrapper(
+        borderRadius: 20,
+        tintColors: [
+          gradColors.first.withOpacity(0.45),
+          gradColors.last.withOpacity(0.22),
+        ],
+        gradient: gradient,
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isHighContrast ? Colors.black : null,
-          gradient: isHighContrast ? null : gradient,
-          borderRadius: BorderRadius.circular(20),
-          border: isHighContrast ? Border.all(color: const Color(0xFFFFD600), width: 2) : null,
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

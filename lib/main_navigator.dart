@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'constants.dart';
 import 'app_data.dart';
+import 'adaptive_glass.dart';
 import 'screens/home_screen.dart';
 import 'screens/diary_screen.dart';
 import 'screens/care_screen.dart';
@@ -255,11 +256,6 @@ class _MainNavigatorState extends State<MainNavigator> {
         isHighContrast ? Colors.black : const Color(0xFF090C10);
     final Color titleColor =
         isHighContrast ? const Color(0xFFFFD600) : Colors.white;
-    final Color navBg =
-        isHighContrast ? Colors.black : const Color(0xFF0F172A);
-    final Color navBorder = isHighContrast
-        ? const Color(0xFFFFD600)
-        : Colors.white.withOpacity(0.05);
 
     return Scaffold(
       extendBody: true,
@@ -322,36 +318,25 @@ class _MainNavigatorState extends State<MainNavigator> {
           ]),
       body: _currentScreen,
       bottomNavigationBar: SafeArea(
-        child: Container(
+        child: AdaptiveGlassContainer(
           margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-          height: 75,
-          decoration: BoxDecoration(
-            color: navBg,
-            borderRadius: BorderRadius.circular(40),
-            border:
-                Border.all(color: navBorder, width: isHighContrast ? 2 : 1),
-            boxShadow: isHighContrast
-                ? null
-                : [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavItem(0, Icons.home_rounded, Icons.home_outlined,
-                  tr('Início', 'Home')),
-              _buildNavItem(1, Icons.view_list_rounded,
-                  Icons.view_list_outlined, tr('Diário', 'Diary')),
-              _buildNavItem(2, Icons.health_and_safety_rounded,
-                  Icons.health_and_safety_outlined, tr('Saúde', 'Care')),
-              _buildNavItem(3, Icons.person_rounded, Icons.person_outline,
-                  tr('Perfil', 'Profile')),
-            ],
+          borderRadius: 40,
+          fallbackColor: const Color(0xFF0F172A),
+          child: SizedBox(
+            height: 75,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(0, Icons.home_rounded, Icons.home_outlined,
+                    tr('Início', 'Home')),
+                _buildNavItem(1, Icons.view_list_rounded,
+                    Icons.view_list_outlined, tr('Diário', 'Diary')),
+                _buildNavItem(2, Icons.health_and_safety_rounded,
+                    Icons.health_and_safety_outlined, tr('Saúde', 'Care')),
+                _buildNavItem(3, Icons.person_rounded, Icons.person_outline,
+                    tr('Perfil', 'Profile')),
+              ],
+            ),
           ),
         ),
       ),
